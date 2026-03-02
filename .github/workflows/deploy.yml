@@ -1,0 +1,34 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  frontend:
+    if: contains(toJSON(github.event.commits.*.modified), 'frontend/') || contains(toJSON(github.event.commits.*.added), 'frontend/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Storage
+        run: gsutil -m rsync -r -d frontend/ gs://${{ secrets.GCS_BUCKET_NAME }}
+
+      - name: Invalidate CDN cache
+        run: gcloud compute url-maps invalidate-cdn-cache ${{ secrets.CDN_URL_MAP }} --path "/*"
+
+  notify:
+    needs: frontend
+    if: always()
+    uses: ./.github/workflows/discord-deploy-notify.yml
+    with:
+      status: ${{ needs.frontend.result }}
+      service: API Frontend
+    secrets:
+      DISCORD_DEPLOY_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}

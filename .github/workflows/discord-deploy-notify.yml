@@ -1,0 +1,53 @@
+name: Discord Deploy Notification
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        required: true
+        type: string
+      service:
+        required: true
+        type: string
+    secrets:
+      DISCORD_DEPLOY_WEBHOOK:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord Notification (Success)
+        if: inputs.status == 'success'
+        run: |
+          curl -sf -H "Content-Type: application/json" -d '{
+            "embeds": [{
+              "title": "✅ Deploy Success",
+              "description": "**${{ inputs.service }}** deployed",
+              "color": 3066993,
+              "fields": [
+                {"name": "Branch", "value": "'"${{ github.ref_name }}"'", "inline": true},
+                {"name": "Commit", "value": "'"${GITHUB_SHA::7}"'", "inline": true},
+                {"name": "Author", "value": "'"${{ github.actor }}"'", "inline": true}
+              ],
+              "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            }]
+          }' "${{ secrets.DISCORD_DEPLOY_WEBHOOK }}"
+
+      - name: Discord Notification (Failure)
+        if: inputs.status == 'failure'
+        run: |
+          curl -sf -H "Content-Type: application/json" -d '{
+            "embeds": [{
+              "title": "❌ Deploy Failed",
+              "description": "**${{ inputs.service }}** deployment failed",
+              "color": 15158332,
+              "fields": [
+                {"name": "Branch", "value": "'"${{ github.ref_name }}"'", "inline": true},
+                {"name": "Commit", "value": "'"${GITHUB_SHA::7}"'", "inline": true},
+                {"name": "Author", "value": "'"${{ github.actor }}"'", "inline": true},
+                {"name": "Logs", "value": "[View Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+              ],
+              "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            }]
+          }' "${{ secrets.DISCORD_DEPLOY_WEBHOOK }}"
