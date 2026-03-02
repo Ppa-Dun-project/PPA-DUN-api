@@ -3,10 +3,11 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - 'frontend/**'
 
 jobs:
   frontend:
-    if: contains(toJSON(github.event.commits.*.modified), 'frontend/') || contains(toJSON(github.event.commits.*.added), 'frontend/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
