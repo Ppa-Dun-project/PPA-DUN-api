@@ -6,30 +6,34 @@ on:
     paths:
       - 'frontend/**'
 
+env:
+  GCP_ZONE: us-east1-b
+
 jobs:
-  frontend:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: google-github-actions/auth@v2
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to Cloud Storage
-        run: gsutil -m rsync -r -d frontend/ gs://${{ secrets.GCS_BUCKET_NAME }}
-
-      - name: Invalidate CDN cache
-        run: gcloud compute url-maps invalidate-cdn-cache ${{ secrets.CDN_URL_MAP }} --path "/*"
+      - name: Deploy to VM
+        run: |
+          gcloud compute ssh ${{ secrets.DEV_INSTANCE_NAME }} \
+            --zone=${{ env.GCP_ZONE }} \
+            --command="cd /app/api && git pull origin main && \
+                       cd /app/cl && sudo docker compose up --build -d fe"
 
   notify:
-    needs: frontend
+    needs: deploy
     if: always()
     uses: ./.github/workflows/discord-deploy-notify.yml
     with:
-      status: ${{ needs.frontend.result }}
+      status: ${{ needs.deploy.result }}
       service: API Frontend
     secrets:
       DISCORD_DEPLOY_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
