@@ -29,6 +29,7 @@ jobs:
             --command="sudo mkdir -p /app/api /app/cl && \
                        if [ -d /app/api/.git ]; then cd /app/api && sudo git pull origin main; else sudo git clone https://github.com/${{ github.repository }}.git /app/api; fi && \
                        if [ -d /app/cl/.git ]; then cd /app/cl && sudo git pull origin main; else sudo git clone https://github.com/Ppa-Dun-project/PPA-DUN-cloud.git /app/cl; fi && \
+                       cd /app/api/frontend && sudo npm ci && sudo npm run build && \
                        cd /app/cl/api && sudo docker compose up --build -d"
 
   notify:
