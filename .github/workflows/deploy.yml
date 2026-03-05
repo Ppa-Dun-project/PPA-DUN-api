@@ -6,7 +6,6 @@ on:
     paths:
       - 'frontend/**'
       - 'api/**'
-  workflow_dispatch:
 
 env:
   GCP_ZONE: us-east1-b
