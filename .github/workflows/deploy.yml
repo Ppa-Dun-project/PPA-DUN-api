@@ -23,10 +23,10 @@ jobs:
 
       - name: Deploy to VM
         run: |
-          gcloud compute ssh ${{ secrets.DEV_INSTANCE_NAME }} \
+          gcloud compute ssh ${{ secrets.API_INSTANCE_NAME }} \
             --zone=${{ env.GCP_ZONE }} \
             --command="cd /app/api && git pull origin main && \
-                       cd /app/cl && sudo docker compose up --build -d fe"
+                       cd /app/cl/api && sudo docker compose up --build -d fe"
 
   notify:
     needs: deploy
