@@ -91,3 +91,25 @@ def get_api_keys(google_token: str, db: Session = Depends(get_db)):
 
     keys = db.query(APIKey).filter(APIKey.user_id == user.id).all()
     return [APIKeyResponse(key=k.key, created_at=str(k.created_at)) for k in keys]
+
+
+@router.delete("/api-key/{key}")
+def delete_api_key(key: str, google_token: str, db: Session = Depends(get_db)):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            google_token, requests.Request(), GOOGLE_CLIENT_ID
+        )
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    user = db.query(User).filter(User.google_id == idinfo["sub"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    api_key = db.query(APIKey).filter(APIKey.key == key, APIKey.user_id == user.id).first()
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    db.delete(api_key)
+    db.commit()
+    return {"detail": "API key deleted"}
