@@ -28,7 +28,7 @@ function Authentication() {
     setError("");
 
     try {
-      const res = await fetch(`${API_URL}/auth/google`, {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: response.credential }),
@@ -49,7 +49,7 @@ function Authentication() {
 
   const fetchApiKeys = async (googleToken: string) => {
     try {
-      const res = await fetch(`${API_URL}/auth/api-keys?google_token=${googleToken}`);
+      const res = await fetch(`${API_URL}/api/auth/api-keys?google_token=${googleToken}`);
       if (res.ok) {
         const keys = await res.json();
         setApiKeys(keys);
@@ -61,7 +61,7 @@ function Authentication() {
 
   const createApiKey = async () => {
     try {
-      const res = await fetch(`${API_URL}/auth/api-key`, {
+      const res = await fetch(`${API_URL}/api/auth/api-key`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),

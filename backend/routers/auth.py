@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from backend.db.session import get_db
 from backend.db.models import User, APIKey
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
