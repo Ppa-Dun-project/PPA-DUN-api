@@ -91,6 +91,20 @@ function Authentication() {
     }
   };
 
+  const deleteApiKey = async (key: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/api-key/${key}?google_token=${token}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        await fetchApiKeys(token);
+      }
+    } catch {
+      setError("Failed to delete API key");
+    }
+  };
+
   const copyToClipboard = (key: string) => {
     navigator.clipboard.writeText(key);
     setCopied(key);
@@ -151,12 +165,20 @@ function Authentication() {
                       className="rounded-2xl border border-white/10 bg-black/40 p-4 flex items-center justify-between gap-4"
                     >
                       <code className="text-sm text-white/80 truncate">{k.key}</code>
-                      <button
-                        onClick={() => copyToClipboard(k.key)}
-                        className="shrink-0 rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
-                      >
-                        {copied === k.key ? "Copied!" : "Copy"}
-                      </button>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => copyToClipboard(k.key)}
+                          className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
+                        >
+                          {copied === k.key ? "Copied!" : "Copy"}
+                        </button>
+                        <button
+                          onClick={() => deleteApiKey(k.key)}
+                          className="rounded-lg bg-red-500/20 px-3 py-1 text-xs text-red-400 hover:bg-red-500/30 transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
