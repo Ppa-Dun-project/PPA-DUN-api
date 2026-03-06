@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from backend.db.session import engine, Base
 from backend.db.models import User, APIKey
+from backend.routers import auth
 
 load_dotenv()
 
@@ -19,6 +20,9 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+
+
+app.include_router(auth.router)
 
 
 @app.get("/health")
