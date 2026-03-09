@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 import os
 from api.routers import player
-from api.services.player import compute_player_value
+from api.services.player import compute_player_value, compute_recommended_bid
+from api.models.player import PlayerValueRequest, PlayerBidRequest
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,7 +23,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
-    # /health, /demo, and OPTIONS requests are exempt from API key check
+    # /health, /demo/*, and OPTIONS are always exempt
     if request.url.path == "/health" or request.url.path.startswith("/demo") or request.method == "OPTIONS":
         return await call_next(request)
 
@@ -58,7 +59,15 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.get("/demo/{player_name}")
-def demo(player_name: str):
-    # Temporary demo endpoint - will be redesigned in Issue #35
-    return {"player_name": player_name, "note": "demo endpoint - Issue #35 pending"}
+# Demo endpoints — no API key required, intended for public dashboard demo only.
+# These call the same service functions as /player/value and /player/bid,
+# but are exposed without authentication so the key is never sent to the browser.
+
+@app.post("/demo/value")
+def demo_value(request: PlayerValueRequest):
+    return compute_player_value(request)
+
+
+@app.post("/demo/bid")
+def demo_bid(request: PlayerBidRequest):
+    return compute_recommended_bid(request)
