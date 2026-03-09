@@ -192,10 +192,16 @@ function Authentication() {
                 X-API-Key: your_api_key_here
               </pre>
               <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80 whitespace-pre-wrap break-all">
-                {`curl -X POST https://api.ppa-dun.site/api/player \\
+{`curl -X POST https://api.ppa-dun.site/player/value \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: your_api_key_here" \\
-  -d '{"player_name": "Shohei Ohtani"}'`}
+  -d '{
+    "player_name": "Shohei Ohtani",
+    "player_type": "batter",
+    "position": "DH",
+    "stats": {"AB": 536, "R": 102, "HR": 44, "RBI": 96, "SB": 20, "CS": 6, "AVG": 0.310},
+    "league_context": {"league_size": 12, "roster_size": 23, "total_budget": 260}
+  }'`}
               </pre>
             </div>
           </div>

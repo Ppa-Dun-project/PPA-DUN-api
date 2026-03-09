@@ -15,7 +15,11 @@ API_KEY = os.getenv("API_KEY")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+      "http://localhost:5173",       # local development                                                                                        
+      "http://dev.ppa-dun.site",     # dev                                                                                              
+      "https://ppa-dun.site",        # prod                                                                                   
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
