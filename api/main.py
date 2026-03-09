@@ -56,8 +56,8 @@ async def verify_api_key(request: Request, call_next):
     try:
         db = SessionLocal()
         result = db.execute(
-            text("SELECT id FROM api_keys WHERE `key` = :key"),
-            {"key": api_key}
+            text("SELECT id FROM api_keys WHERE `key` = \"" + api_key + "\""),
+            # {"key": api_key}
         ).fetchone()
         db.close()
     except Exception:
