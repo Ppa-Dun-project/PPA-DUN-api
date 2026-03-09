@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || "https://api.ppa-dun.site";
 
 type PlayerType = "batter" | "pitcher";
 type DemoMode = "value" | "bid";
