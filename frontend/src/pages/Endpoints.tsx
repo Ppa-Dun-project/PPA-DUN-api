@@ -227,14 +227,6 @@ const BID_SCHEMA: SchemaRow[] = [
   { field: "draft_context.drafted_players_count", type: "int", description: "Total players drafted across all teams so far" },
 ];
 
-const TIERS = [
-  { label: "Elite", range: "80 – 100", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20" },
-  { label: "Strong", range: "60 – 79", color: "text-green-400", bg: "bg-green-400/10 border-green-400/20" },
-  { label: "Average", range: "40 – 59", color: "text-blue-400", bg: "bg-blue-400/10 border-blue-400/20" },
-  { label: "Below Average", range: "20 – 39", color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20" },
-  { label: "Replacement Level", range: "0 – 19", color: "text-red-400", bg: "bg-red-400/10 border-red-400/20" },
-];
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 function Endpoints() {
