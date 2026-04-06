@@ -75,21 +75,25 @@ function Authentication() {
     }
   };
 
-  const createApiKey = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/auth/api-key`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
+const createApiKey = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/api-key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
 
-      if (res.ok) {
-        await fetchApiKeys(token);
-      }
-    } catch {
-      setError("Failed to create API key");
+    if (!res.ok) {
+      const err = await res.json();
+      setError(err.detail || "Failed to create API key");
+      return;
     }
-  };
+
+    await fetchApiKeys(token);
+  } catch {
+    setError("Failed to create API key");
+  }
+};
 
   const deleteApiKey = async (key: string) => {
     try {
@@ -149,11 +153,16 @@ function Authentication() {
                 <p className="text-xs font-bold text-white/40 uppercase">Your API Keys</p>
                 <button
                   onClick={createApiKey}
+                  disabled={apiKeys.length >= 1}
                   className="rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-black hover:bg-white/90 transition"
                 >
                   Generate New Key
                 </button>
               </div>
+
+              {error && (
+                <p className="text-sm text-red-400">{error}</p>
+              )}
 
               {apiKeys.length === 0 ? (
                 <p className="text-sm text-white/40">No API keys yet. Generate one to get started.</p>

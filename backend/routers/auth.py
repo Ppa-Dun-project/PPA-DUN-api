@@ -66,6 +66,14 @@ def create_api_key(google_token: GoogleLoginRequest, db: Session = Depends(get_d
     user = db.query(User).filter(User.google_id == idinfo["sub"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check one-key-per-user limit
+    existing_key = db.query(APIKey).filter(APIKey.user_id == user.id).first()
+    if existing_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Each account is limited to one API key. Delete your existing key before generating a new one."
+        )
 
     key = secrets.token_hex(32)
     api_key = APIKey(key=key, user_id=user.id)
