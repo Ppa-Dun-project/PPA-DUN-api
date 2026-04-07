@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -14,8 +14,9 @@ load_dotenv()
 
 # ── Database ─────────────────────────────────────────────────────────────────
 
-DATABASE_URL = "mysql+pymysql://root:{password}@db:3306/{db}".format(
+DATABASE_URL = "mysql+pymysql://root:{password}@{host}:3306/{db}".format(
     password=os.getenv("MYSQL_ROOT_PASSWORD", ""),
+    host=os.getenv("MYSQL_HOST", "db"),
     db=os.getenv("MYSQL_DATABASE", "ppa_dun_api"),
 )
 
@@ -26,16 +27,34 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 app = FastAPI(title="PPA-DUN API")
 
+# Allow all origins globally so external API consumers can call /player/* from
+# any domain. /demo/* origin restriction is enforced per-handler below.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",       # local development
-        "http://dev.ppa-dun.site",     # dev
-        "https://ppa-dun.site",        # prod
-    ],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Demo Origin Restriction ───────────────────────────────────────────────────
+# /demo/* endpoints have no API key authentication, so we restrict them to
+# requests originating from the official dashboard domain only.
+# Requests with no Origin header (curl, server-to-server) are not blocked here
+# and are handled separately by SEC-06 (rate limiting).
+
+DEMO_ALLOWED_ORIGINS = {
+    "https://ppa-dun.site",
+    "http://localhost:5173",
+    "http://dev.ppa-dun.site",
+}
+
+def check_demo_origin(request: Request):
+    origin = request.headers.get("origin")
+    if origin and origin not in DEMO_ALLOWED_ORIGINS:
+        raise HTTPException(
+            status_code=403,
+            detail="Origin not allowed for demo endpoints"
+        )
 
 # ── Middleware ────────────────────────────────────────────────────────────────
 
@@ -97,13 +116,15 @@ def health_check():
 # ── Demo Endpoints ────────────────────────────────────────────────────────────
 # No API key required. Calls the same service functions as /player/value and
 # /player/bid, but exposed without authentication so the key is never sent
-# to the browser.
+# to the browser. Origin is restricted to the official dashboard domain.
 
 @app.post("/demo/value")
-def demo_value(request: PlayerValueRequest):
-    return compute_player_value(request)
+def demo_value(request: Request, body: PlayerValueRequest):
+    check_demo_origin(request)
+    return compute_player_value(body)
 
 
 @app.post("/demo/bid")
-def demo_bid(request: PlayerBidRequest):
-    return compute_recommended_bid(request)
+def demo_bid(request: Request, body: PlayerBidRequest):
+    check_demo_origin(request)
+    return compute_recommended_bid(body)
