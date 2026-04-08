@@ -43,9 +43,8 @@ app.add_middleware(
 # and are handled separately by SEC-06 (rate limiting).
 
 DEMO_ALLOWED_ORIGINS = {
-    "https://ppa-dun.site",
-    "http://localhost:5173",
-    "http://dev.ppa-dun.site",
+    os.getenv("LOCAL_API_SERVER_URL"),
+    "https://api.ppa-dun.site/demo",
 }
 
 def check_demo_origin(request: Request):
