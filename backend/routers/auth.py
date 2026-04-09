@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from pydantic import BaseModel
-from backend.db.session import get_db
-from backend.db.models import User, APIKey
+from db.session import get_db
+from db.models import User, APIKey
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

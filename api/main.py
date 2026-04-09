@@ -6,6 +6,10 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from api.routers import player
 from api.services.player import compute_player_value, compute_recommended_bid
 from api.models.player import PlayerValueRequest, PlayerBidRequest
@@ -36,6 +40,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Rate Limiter ──────────────────────────────────────────────────────────────
+# Applied to /demo/* endpoints only. /player/* is protected by API key auth.
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please wait a moment and try again."},
+    )
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 # ── Demo Origin Restriction ───────────────────────────────────────────────────
 # /demo/* endpoints have no API key authentication, so we restrict them to
 # requests originating from the official dashboard domain only.
@@ -63,7 +82,6 @@ def check_demo_origin(request: Request):
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
-    # /health, /demo/*, and OPTIONS are always exempt
     if request.url.path == "/health" or request.url.path.startswith("/demo") or request.method == "OPTIONS":
         return await call_next(request)
 
@@ -74,7 +92,6 @@ async def verify_api_key(request: Request, call_next):
             content={"detail": "Missing API key"}
         )
 
-    # Look up the key in the database
     try:
         db = SessionLocal()
         result = db.execute(
@@ -82,7 +99,8 @@ async def verify_api_key(request: Request, call_next):
             {"key": api_key}
         ).fetchone()
         db.close()
-    except Exception:
+    except Exception as e:
+        print(f"DB ERROR: {e}")  # 임시 디버깅용
         return JSONResponse(
             status_code=503,
             content={"detail": "Service unavailable"}
@@ -120,14 +138,17 @@ def health_check():
 # No API key required. Calls the same service functions as /player/value and
 # /player/bid, but exposed without authentication so the key is never sent
 # to the browser. Origin is restricted to the official dashboard domain.
+# Rate limited to 10 requests per minute per IP to prevent scripted abuse.
 
 @app.post("/demo/value")
+@limiter.limit("10/minute")
 def demo_value(request: Request, body: PlayerValueRequest):
     check_demo_origin(request)
     return compute_player_value(body)
 
 
 @app.post("/demo/bid")
+@limiter.limit("10/minute")
 def demo_bid(request: Request, body: PlayerBidRequest):
     check_demo_origin(request)
     return compute_recommended_bid(body)
