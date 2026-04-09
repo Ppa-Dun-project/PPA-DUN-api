@@ -46,7 +46,7 @@ DEMO_ALLOWED_ORIGINS = {
     "https://api.ppa-dun.site",
 }
 
-_local_url = os.getenv("LOCAL_DASHBOARD_URL")
+_local_url = os.getenv("LOCAL_API_SERVER_URL")
 if _local_url:
     DEMO_ALLOWED_ORIGINS.add(_local_url)
 
