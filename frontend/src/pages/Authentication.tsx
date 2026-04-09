@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://api.ppa-dun.site";
+const BACKEND_URL =  import.meta.env.VITE_BACKEND_URL || "https://api.ppa-dun.site";
 
 interface APIKey {
   key: string;

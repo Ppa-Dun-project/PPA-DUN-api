@@ -41,8 +41,14 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Upload to GCS
-        run: gsutil -m rsync -r -d frontend/dist gs://v2-api-ppa-dun
+      - name: Deploy to API Server
+        run: |
+          gcloud compute ssh ${{ secrets.API_INSTANCE_NAME }} \
+            --zone=${{ env.GCP_ZONE }} \
+            --command="sudo mkdir -p /app/api/frontend/dist && sudo chown -R \$(whoami) /app/api/frontend"
+          gcloud compute scp --recurse frontend/dist/* \
+            ${{ secrets.API_INSTANCE_NAME }}:/app/api/frontend/dist/ \
+            --zone=${{ env.GCP_ZONE }}
 
   notify:
     needs: build-and-deploy
