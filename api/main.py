@@ -82,7 +82,6 @@ def check_demo_origin(request: Request):
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
-    # /health, /demo/*, and OPTIONS are always exempt
     if request.url.path == "/health" or request.url.path.startswith("/demo") or request.method == "OPTIONS":
         return await call_next(request)
 
@@ -93,7 +92,6 @@ async def verify_api_key(request: Request, call_next):
             content={"detail": "Missing API key"}
         )
 
-    # Look up the key in the database
     try:
         db = SessionLocal()
         result = db.execute(
@@ -101,7 +99,8 @@ async def verify_api_key(request: Request, call_next):
             {"key": api_key}
         ).fetchone()
         db.close()
-    except Exception:
+    except Exception as e:
+        print(f"DB ERROR: {e}")  # 임시 디버깅용
         return JSONResponse(
             status_code=503,
             content={"detail": "Service unavailable"}

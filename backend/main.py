@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from backend.db.session import engine, Base
-from backend.db.models import User, APIKey
-from backend.routers import auth
+from db.session import engine, Base
+from db.models import User, APIKey
+from routers import auth
 
 load_dotenv()
 
