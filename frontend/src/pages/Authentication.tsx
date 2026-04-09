@@ -3,6 +3,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://api.ppa-dun.site";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://api.ppa-dun.site";
 
 interface APIKey {
   key: string;
@@ -44,7 +45,7 @@ function Authentication() {
     setError("");
 
     try {
-      const res = await fetch(`${API_URL}/api/auth/google`, {
+      const res = await fetch(`${BACKEND_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: response.credential }),
@@ -65,7 +66,7 @@ function Authentication() {
 
   const fetchApiKeys = async (googleToken: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/api-keys?google_token=${googleToken}`);
+      const res = await fetch(`${BACKEND_URL}/api/auth/api-keys?google_token=${googleToken}`);
       if (res.ok) {
         const keys = await res.json();
         setApiKeys(keys);
@@ -77,7 +78,7 @@ function Authentication() {
 
 const createApiKey = async () => {
   try {
-    const res = await fetch(`${API_URL}/api/auth/api-key`, {
+    const res = await fetch(`${BACKEND_URL}/api/auth/api-key`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
@@ -97,7 +98,7 @@ const createApiKey = async () => {
 
   const deleteApiKey = async (key: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/api-key/${key}?google_token=${token}`, {
+      const res = await fetch(`${BACKEND_URL}/api/auth/api-key/${key}?google_token=${token}`, {
         method: "DELETE",
       });
 

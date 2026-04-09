@@ -7,7 +7,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from api.routers import player
@@ -42,8 +41,15 @@ app.add_middleware(
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
 # Applied to /demo/* endpoints only. /player/* is protected by API key auth.
+# X-Forwarded-For is used to get the real client IP behind nginx reverse proxy.
 
-limiter = Limiter(key_func=get_remote_address)
+def get_real_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host
+
+limiter = Limiter(key_func=get_real_ip)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
@@ -99,8 +105,7 @@ async def verify_api_key(request: Request, call_next):
             {"key": api_key}
         ).fetchone()
         db.close()
-    except Exception as e:
-        print(f"DB ERROR: {e}")  # 임시 디버깅용
+    except Exception:
         return JSONResponse(
             status_code=503,
             content={"detail": "Service unavailable"}
