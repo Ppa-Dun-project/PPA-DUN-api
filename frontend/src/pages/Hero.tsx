@@ -1,11 +1,22 @@
+// Hero.tsx — Landing page of the PPA-DUN dashboard.
+// Divided into two main sections:
+//   1. Hero section   : product tagline and short description
+//   2. Algorithm section : step-by-step explanation of player_value and
+//                          recommended_bid calculation, with code samples
+
 function Hero() {
   return (
+    // Outer container: column layout, centered, with bottom padding for scroll breathing room
     <div className="relative flex flex-col items-center px-6 pb-24">
-      {/* Background Gradient */}
+
+      {/* Decorative background gradient — fades from slightly white to pure black top-to-bottom.
+          pointer-events-none prevents it from blocking clicks on content above it. */}
       <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-black pointer-events-none" />
 
-      {/* Hero section */}
+      {/* ── Hero section ────────────────────────────────────────────────────── */}
       <div className="relative z-10 max-w-2xl text-center pt-32 pb-24">
+
+        {/* Pill badge */}
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-white/50 mb-6">
           PPA-DUN Evaluator · Fantasy Baseball
         </div>
@@ -24,7 +35,8 @@ function Hero() {
         </div>
       </div>
 
-      {/* Algorithm section */}
+      {/* ── Algorithm section ───────────────────────────────────────────────── */}
+      {/* space-y-6 adds vertical gap between the two algorithm cards below */}
       <div className="relative z-10 max-w-2xl w-full space-y-6">
 
         <div>
@@ -38,12 +50,17 @@ function Hero() {
           </p>
         </div>
 
-        {/* ── player_value ── */}
+        {/* ── Card 1: player_value ─────────────────────────────────────────── */}
+        {/* Each card uses space-y-6 internally to stack its Step subsections */}
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-6">
 
+          {/* Output field label */}
           <div>
             <p className="text-xs font-bold text-white/40 uppercase mb-1">Output field</p>
-            <p className="text-white text-lg font-extrabold">player_value <span className="text-white/40 font-normal text-sm">float · 0.0 ~ 100.0</span></p>
+            <p className="text-white text-lg font-extrabold">
+              player_value{" "}
+              <span className="text-white/40 font-normal text-sm">float · 0.0 ~ 100.0</span>
+            </p>
           </div>
 
           <p className="text-sm text-white/60 leading-relaxed">
@@ -52,7 +69,7 @@ function Hero() {
             A value of <span className="text-white/80">80+</span> means elite — top tier across multiple categories.
           </p>
 
-          {/* Step 1 */}
+          {/* Step 1 — Z-Score */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 1 — Z-Score per category</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -61,6 +78,7 @@ function Hero() {
               A z-score of <span className="text-white/80">+1.0</span> means one standard deviation above average —
               roughly top 16% of the player pool.
             </p>
+            {/* Code block: formula rendered in a monospace pre block */}
             <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80 overflow-auto">
 {`z(stat) = (player_stat - league_mean) / league_std
 
@@ -73,7 +91,7 @@ z(WHIP) = -(player_WHIP - mean_WHIP) / std_WHIP`}
             </pre>
           </div>
 
-          {/* Step 2 */}
+          {/* Step 2 — Sum z-scores */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 2 — Sum z-scores</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -89,7 +107,7 @@ z_total = z(W) + z(SV) + z(K) + z(ERA) + z(WHIP)`}
             </pre>
           </div>
 
-          {/* Step 3 */}
+          {/* Step 3 — Position bonus & risk penalty */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 3 — Position bonus & risk penalty</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -114,7 +132,7 @@ Risk penalty (z units):
             </pre>
           </div>
 
-          {/* Step 4 */}
+          {/* Step 4 — Normalize */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 4 — Normalize to 0–100</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -127,7 +145,7 @@ Risk penalty (z units):
             </pre>
           </div>
 
-          {/* Tier table */}
+          {/* Value tier table — data-driven render to avoid repetitive JSX */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Value tiers</p>
             <div className="rounded-2xl border border-white/10 overflow-hidden">
@@ -141,11 +159,11 @@ Risk penalty (z units):
                 </thead>
                 <tbody>
                   {[
-                    { label: "Elite", range: "80 – 100", color: "text-yellow-400", meaning: "Top-tier player, draft early" },
-                    { label: "Strong", range: "60 – 79", color: "text-green-400", meaning: "Reliable starter, solid value" },
-                    { label: "Average", range: "40 – 59", color: "text-blue-400", meaning: "League-average contributor" },
-                    { label: "Below Average", range: "20 – 39", color: "text-orange-400", meaning: "Situational or streaky value" },
-                    { label: "Replacement", range: "0 – 19", color: "text-red-400", meaning: "Waiver wire / bench depth only" },
+                    { label: "Elite",        range: "80 – 100", color: "text-yellow-400", meaning: "Top-tier player, draft early" },
+                    { label: "Strong",       range: "60 – 79",  color: "text-green-400",  meaning: "Reliable starter, solid value" },
+                    { label: "Average",      range: "40 – 59",  color: "text-blue-400",   meaning: "League-average contributor" },
+                    { label: "Below Average",range: "20 – 39",  color: "text-orange-400", meaning: "Situational or streaky value" },
+                    { label: "Replacement",  range: "0 – 19",   color: "text-red-400",    meaning: "Waiver wire / bench depth only" },
                   ].map((tier, i, arr) => (
                     <tr key={tier.label} className={i !== arr.length - 1 ? "border-b border-white/5" : ""}>
                       <td className={`px-4 py-2 font-bold text-xs ${tier.color}`}>{tier.label}</td>
@@ -158,14 +176,18 @@ Risk penalty (z units):
             </div>
           </div>
 
-        </div>
+        </div>{/* end card 1: player_value */}
 
-        {/* ── recommended_bid ── */}
+        {/* ── Card 2: recommended_bid ──────────────────────────────────────── */}
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-6">
 
+          {/* Output field label */}
           <div>
             <p className="text-xs font-bold text-white/40 uppercase mb-1">Output field</p>
-            <p className="text-white text-lg font-extrabold">recommended_bid <span className="text-white/40 font-normal text-sm">integer · dollar amount ($)</span></p>
+            <p className="text-white text-lg font-extrabold">
+              recommended_bid{" "}
+              <span className="text-white/40 font-normal text-sm">integer · dollar amount ($)</span>
+            </p>
           </div>
 
           <p className="text-sm text-white/60 leading-relaxed">
@@ -175,7 +197,7 @@ Risk penalty (z units):
             It is always at least <span className="text-white/80">$1</span> and never exceeds what you can safely spend.
           </p>
 
-          {/* Step 1 */}
+          {/* Step 1 — Base price */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 1 — Base price from player_value</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -191,7 +213,7 @@ base_price = (player_value / 100) * total_budget * HIT_PITCH_RATIO`}
             </pre>
           </div>
 
-          {/* Step 2 */}
+          {/* Step 2 — Scarcity multiplier */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 2 — Positional scarcity multiplier</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -210,7 +232,7 @@ Scarcity multipliers:
             </pre>
           </div>
 
-          {/* Step 3 */}
+          {/* Step 3 — Draft progress adjustment */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 3 — Draft progress adjustment</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -236,7 +258,7 @@ recommended_bid = clip(
             </pre>
           </div>
 
-          {/* Step 4 */}
+          {/* Step 4 — Budget ceiling */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-white/40 uppercase">Step 4 — Budget ceiling (max_spendable)</p>
             <p className="text-sm text-white/60 leading-relaxed">
@@ -253,7 +275,7 @@ spendable    = my_remaining_budget - min_reserve
             </pre>
           </div>
 
-        </div>
+        </div>{/* end card 2: recommended_bid */}
 
       </div>
     </div>

@@ -1,23 +1,35 @@
 import { useState } from "react";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+// Tab controls which example (batter or pitcher) is displayed in each card
 type Tab = "batter" | "pitcher";
 
+// Represents one row in the request field schema table
 interface SchemaRow {
-  field: string;
-  type: string;
+  field:       string;
+  type:        string;
   description: string;
 }
 
+// Props for the reusable EndpointCard component.
+// Each card displays one API endpoint with batter/pitcher toggled examples.
 interface EndpointCardProps {
-  method: string;
-  path: string;
-  description: string;
-  batterRequest: object;
-  pitcherRequest: object;
-  batterResponse: object;
+  method:          string;
+  path:            string;
+  description:     string;
+  batterRequest:   object;
+  pitcherRequest:  object;
+  batterResponse:  object;
   pitcherResponse: object;
-  schema: SchemaRow[];
+  schema:          SchemaRow[];
 }
+
+// ── EndpointCard ──────────────────────────────────────────────────────────────
+// Reusable card component that documents a single API endpoint.
+// Rendered twice in the Endpoints page — once for /player/value and once for
+// /player/bid. The batter/pitcher toggle switches the displayed JSON examples
+// without fetching data — all example objects are passed in as props.
 
 function EndpointCard({
   method,
@@ -29,11 +41,13 @@ function EndpointCard({
   pitcherResponse,
   schema,
 }: EndpointCardProps) {
+  // tab state controls which example JSON is shown (batter or pitcher)
   const [tab, setTab] = useState<Tab>("batter");
 
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-6">
-      {/* Title */}
+
+      {/* Endpoint title: METHOD badge + path */}
       <div className="flex items-center gap-3">
         <span className="rounded-lg bg-white/10 px-3 py-1 text-xs font-bold text-white">
           {method}
@@ -42,7 +56,7 @@ function EndpointCard({
       </div>
       <p className="text-sm text-white/50">{description}</p>
 
-      {/* Batter / Pitcher toggle */}
+      {/* Batter / Pitcher toggle — switches request and response example JSONs */}
       <div className="flex gap-2">
         {(["batter", "pitcher"] as Tab[]).map((t) => (
           <button
@@ -50,16 +64,17 @@ function EndpointCard({
             onClick={() => setTab(t)}
             className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
               tab === t
-                ? "bg-white text-black"
-                : "bg-white/10 text-white/50 hover:bg-white/20"
+                ? "bg-white text-black"          // active: filled white
+                : "bg-white/10 text-white/50 hover:bg-white/20"  // inactive: ghost
             }`}
           >
+            {/* Capitalize first letter: "batter" → "Batter" */}
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
 
-      {/* Request */}
+      {/* Request example — JSON.stringify with 2-space indent for readability */}
       <div>
         <p className="text-xs font-bold text-white/40 uppercase mb-2">Request</p>
         <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80 whitespace-pre-wrap break-all overflow-auto">
@@ -67,7 +82,7 @@ function EndpointCard({
         </pre>
       </div>
 
-      {/* Response */}
+      {/* Response example — switches alongside the request on tab change */}
       <div>
         <p className="text-xs font-bold text-white/40 uppercase mb-2">Response</p>
         <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80 whitespace-pre-wrap break-all overflow-auto">
@@ -75,7 +90,9 @@ function EndpointCard({
         </pre>
       </div>
 
-      {/* Schema table */}
+      {/* Schema table — lists all request fields, their types, and descriptions.
+          BID_SCHEMA extends VALUE_SCHEMA by spreading it and appending
+          draft_context fields, so this table automatically shows all fields. */}
       <div>
         <p className="text-xs font-bold text-white/40 uppercase mb-3">Request Fields</p>
         <div className="rounded-2xl border border-white/10 overflow-hidden">
@@ -89,6 +106,7 @@ function EndpointCard({
             </thead>
             <tbody>
               {schema.map((row, i) => (
+                // Bottom border on all rows except the last
                 <tr key={row.field} className={i !== schema.length - 1 ? "border-b border-white/5" : ""}>
                   <td className="px-4 py-2 font-mono text-white/80 text-xs">{row.field}</td>
                   <td className="px-4 py-2 text-white/40 text-xs">{row.type}</td>
@@ -100,18 +118,22 @@ function EndpointCard({
         </div>
       </div>
 
-      {/* Required header */}
+      {/* Required header reminder — shown for all authenticated endpoints */}
       <div>
         <p className="text-xs font-bold text-white/40 uppercase mb-2">Required Header</p>
         <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80">
           X-API-Key: your_api_key_here
         </pre>
       </div>
+
     </div>
   );
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
+// ── Static Example Data ───────────────────────────────────────────────────────
+// All request/response objects are hardcoded for documentation purposes.
+// These are NOT live API calls — they are displayed as-is in the JSON blocks.
+// If the API schema changes, these objects must be updated manually.
 
 const VALUE_BATTER_REQUEST = {
   player_name: "Juan Soto",
@@ -197,46 +219,53 @@ const BID_PITCHER_RESPONSE = {
   },
 };
 
+// VALUE_SCHEMA: fields for POST /player/value
 const VALUE_SCHEMA: SchemaRow[] = [
-  { field: "player_name", type: "string", description: "Player full name" },
-  { field: "player_type", type: '"batter" | "pitcher"', description: "Player type" },
-  { field: "position", type: "string", description: 'Position (e.g. "OF", "SP", "C")' },
-  { field: "stats.AB", type: "int", description: "At bats (batter only)" },
-  { field: "stats.R", type: "int", description: "Runs (batter only)" },
-  { field: "stats.HR", type: "int", description: "Home runs (batter only)" },
-  { field: "stats.RBI", type: "int", description: "Runs batted in (batter only)" },
-  { field: "stats.SB", type: "int", description: "Stolen bases (batter only)" },
-  { field: "stats.CS", type: "int", description: "Caught stealing (batter only)" },
-  { field: "stats.AVG", type: "float", description: "Batting average (batter only)" },
-  { field: "stats.IP", type: "float", description: "Innings pitched (pitcher only)" },
-  { field: "stats.W", type: "int", description: "Wins (pitcher only)" },
-  { field: "stats.SV", type: "int", description: "Saves (pitcher only)" },
-  { field: "stats.K", type: "int", description: "Strikeouts (pitcher only)" },
-  { field: "stats.ERA", type: "float", description: "Earned run average (pitcher only)" },
-  { field: "stats.WHIP", type: "float", description: "Walks + hits per inning (pitcher only)" },
-  { field: "league_context.league_size", type: "int", description: "Number of teams in the league" },
-  { field: "league_context.roster_size", type: "int", description: "Roster spots per team" },
-  { field: "league_context.total_budget", type: "int", description: "Auction budget per team ($)" },
+  { field: "player_name",                    type: "string",              description: "Player full name" },
+  { field: "player_type",                    type: '"batter" | "pitcher"',description: "Player type" },
+  { field: "position",                       type: "string",              description: 'Position (e.g. "OF", "SP", "C")' },
+  { field: "stats.AB",                       type: "int",                 description: "At bats (batter only)" },
+  { field: "stats.R",                        type: "int",                 description: "Runs (batter only)" },
+  { field: "stats.HR",                       type: "int",                 description: "Home runs (batter only)" },
+  { field: "stats.RBI",                      type: "int",                 description: "Runs batted in (batter only)" },
+  { field: "stats.SB",                       type: "int",                 description: "Stolen bases (batter only)" },
+  { field: "stats.CS",                       type: "int",                 description: "Caught stealing (batter only)" },
+  { field: "stats.AVG",                      type: "float",               description: "Batting average (batter only)" },
+  { field: "stats.IP",                       type: "float",               description: "Innings pitched (pitcher only)" },
+  { field: "stats.W",                        type: "int",                 description: "Wins (pitcher only)" },
+  { field: "stats.SV",                       type: "int",                 description: "Saves (pitcher only)" },
+  { field: "stats.K",                        type: "int",                 description: "Strikeouts (pitcher only)" },
+  { field: "stats.ERA",                      type: "float",               description: "Earned run average (pitcher only)" },
+  { field: "stats.WHIP",                     type: "float",               description: "Walks + hits per inning (pitcher only)" },
+  { field: "league_context.league_size",     type: "int",                 description: "Number of teams in the league" },
+  { field: "league_context.roster_size",     type: "int",                 description: "Roster spots per team" },
+  { field: "league_context.total_budget",    type: "int",                 description: "Auction budget per team ($)" },
 ];
 
+// BID_SCHEMA: extends VALUE_SCHEMA by spreading it and appending draft_context fields.
+// This avoids duplication — /player/bid accepts all value fields plus the four below.
 const BID_SCHEMA: SchemaRow[] = [
   ...VALUE_SCHEMA,
-  { field: "draft_context.my_remaining_budget", type: "int", description: "Your remaining auction budget ($)" },
-  { field: "draft_context.my_remaining_roster_spots", type: "int", description: "Roster spots you still need to fill" },
-  { field: "draft_context.my_positions_filled", type: "string[]", description: "Positions you have already filled" },
-  { field: "draft_context.drafted_players_count", type: "int", description: "Total players drafted across all teams so far" },
+  { field: "draft_context.my_remaining_budget",       type: "int",      description: "Your remaining auction budget ($)" },
+  { field: "draft_context.my_remaining_roster_spots", type: "int",      description: "Roster spots you still need to fill" },
+  { field: "draft_context.my_positions_filled",       type: "string[]", description: "Positions you have already filled" },
+  { field: "draft_context.drafted_players_count",     type: "int",      description: "Total players drafted across all teams so far" },
 ];
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Endpoints Page ────────────────────────────────────────────────────────────
+// Renders two EndpointCard components, one per authenticated endpoint.
+// The page itself is purely presentational — no state or API calls.
 
 function Endpoints() {
   return (
     <div className="relative min-h-screen flex flex-col items-center px-6 pt-24 pb-16">
+
+      {/* Decorative background gradient — same pattern as Hero.tsx */}
       <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-black pointer-events-none" />
 
       <div className="relative z-10 max-w-2xl w-full space-y-16">
 
-        {/* Header */}
+        {/* Page header */}
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">
             Endpoints
@@ -248,7 +277,7 @@ function Endpoints() {
           </p>
         </div>
 
-        {/* /player/value */}
+        {/* POST /player/value */}
         <EndpointCard
           method="POST"
           path="/player/value"
@@ -260,7 +289,7 @@ function Endpoints() {
           schema={VALUE_SCHEMA}
         />
 
-        {/* /player/bid */}
+        {/* POST /player/bid */}
         <EndpointCard
           method="POST"
           path="/player/bid"
