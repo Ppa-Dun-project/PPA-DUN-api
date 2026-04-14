@@ -8,9 +8,5 @@ node_modules/
 !.env.example
 
 # Local development
-Dockerfile
 docker-compose.local.yml
-api/Dockerfile
-backend/Dockerfile
-frontend/Dockerfile
 frontend/.env
