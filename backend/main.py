@@ -6,16 +6,13 @@ from db.models import User, APIKey  # noqa: F401 — imported to register models
 from routers import auth
 
 # Load environment variables from .env file
-# (MYSQL_ROOT_PASSWORD, MYSQL_HOST, MYSQL_DATABASE, GOOGLE_CLIENT_ID, etc.)
 load_dotenv()
 
-app = FastAPI(title="PPA-DUN Backend")
+app = FastAPI(title="PPA-DUN Backend") # the server
 
 # ── CORS Middleware ───────────────────────────────────────────────────────────
-# Allow all origins so the dashboard frontend (ppa-dun.site) and local dev
-# environments can call the backend without CORS errors.
-# The backend is only reachable through nginx, which limits exposure
-# to the public internet.
+# Browser basically blocks frontend JavaScript from making requests to a different origin.
+# Allow all origins so the dashboard frontend
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,8 +25,6 @@ app.add_middleware(
 # Runs once when the server starts.
 # create_all() checks the DB and creates any tables that do not yet exist,
 # based on the SQLAlchemy model definitions in db/models.py.
-# It is safe to call on every startup — existing tables are never dropped or
-# modified. This acts as a lightweight migration for the initial deployment.
 
 @app.on_event("startup")
 def on_startup():

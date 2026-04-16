@@ -7,9 +7,6 @@ from api.models.player import (
 )
 from api.services.player import compute_player_value, compute_recommended_bid
 
-# APIRouter groups related endpoints together.
-# This router is registered in main.py via app.include_router(player.router),
-# which mounts all routes defined here onto the main FastAPI app.
 router = APIRouter()
 
 
