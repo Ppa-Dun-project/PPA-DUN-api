@@ -9,7 +9,6 @@ from db.session import get_db
 from db.models import User, APIKey
 
 # All routes in this router are prefixed with /api/auth.
-# These endpoints handle Google OAuth login and API key lifecycle management.
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # GOOGLE_CLIENT_ID is used to verify that incoming Google ID tokens were

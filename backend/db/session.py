@@ -3,10 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # ── Database URL ──────────────────────────────────────────────────────────────
-# Reads DATABASE_URL from the environment first.
-# If not set, falls back to a constructed pymysql URL using individual
-# MYSQL_* environment variables (set in Docker Compose or .env).
-# "db" in the hostname refers to the MySQL container's Docker Compose service name.
+# Build the database URL from env variables.
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -17,35 +14,28 @@ DATABASE_URL = os.getenv(
 )
 
 # ── Engine ────────────────────────────────────────────────────────────────────
-# The engine manages the connection pool to the database.
-# pool_pre_ping=True: before each connection is used, SQLAlchemy sends a
-# lightweight "ping" query to verify the connection is still alive.
-# This prevents errors caused by stale connections after DB restarts.
+# Create object that actually connects to the database.
+# pool_pre_ping=True: checks connections before use.
+# Also manages "connection pool" of reusable connections for efficiency.
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # ── Session Factory ───────────────────────────────────────────────────────────
-# SessionLocal is a factory for creating individual DB sessions.
-# autocommit=False: all changes must be explicitly committed with db.commit().
-# autoflush=False:  changes are not automatically synced to DB before queries.
-# Each request gets its own session via the get_db() dependency below.
+# Session = basic unit for DB operations.
+# SessionLocal call will make new session.
+# autocommit=False: changes are not auto-committed
+# autoflush=False: changes are not auto-flushed
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 # ── Base ──────────────────────────────────────────────────────────────────────
-# declarative_base() returns a base class that all ORM models inherit from.
-# SQLAlchemy uses this base to track all model classes and their table mappings.
-# Base.metadata.create_all(engine) in backend/main.py uses this to create tables
-# on startup.
+# Parent class for all DB tables creating.
 
 Base = declarative_base()
 
 
 # ── Dependency ────────────────────────────────────────────────────────────────
-# get_db() is a FastAPI dependency used via Depends(get_db) in route handlers.
-# It yields a DB session for the duration of a single request, then closes it
-# in the finally block — ensuring the connection is always returned to the pool
-# even if an exception is raised during request handling.
+# offers a session to each API call and closes the session.
 
 def get_db():
     db = SessionLocal()
