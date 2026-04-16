@@ -17,12 +17,7 @@ from api.models.player import PlayerValueRequest, PlayerBidRequest
 load_dotenv()
 
 # ── Database ──────────────────────────────────────────────────────────────────
-# Build the MySQL connection URL from environment variables.
-# Using pymysql as the driver (mysql+pymysql://...).
-# pool_pre_ping=True: SQLAlchemy tests each connection before use to detect
-# stale/dropped connections and automatically reconnect.
-# The cryptography package is required for pymysql to handle MySQL 8.0's
-# default authentication plugin (caching_sha2_password).
+# Build the database URL from env variables.
 
 DATABASE_URL = "mysql+pymysql://root:{password}@{host}:3306/{db}".format(
     password=os.getenv("MYSQL_ROOT_PASSWORD", ""),
@@ -32,20 +27,17 @@ DATABASE_URL = "mysql+pymysql://root:{password}@{host}:3306/{db}".format(
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-# SessionLocal is a factory for creating DB sessions.
 # autocommit=False: transactions must be committed explicitly.
 # autoflush=False: changes are not flushed to DB until commit or explicit flush.
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="PPA-DUN API")
+app = FastAPI(title="PPA-DUN API") # the app object
 
 # ── CORS Middleware ───────────────────────────────────────────────────────────
-# Allow all origins globally so external API consumers (licensed clients) can
-# call /player/* from any domain without CORS errors.
-# /demo/* origin restriction is enforced separately in check_demo_origin()
-# because CORS headers alone cannot block server-side requests (e.g., curl).
+# Browser basically blocks frontend JavaScript from making requests to a different origin.
+# Allow all origins so the dashboard frontend
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,13 +47,10 @@ app.add_middleware(
 )
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
-# slowapi provides per-IP rate limiting, applied only to /demo/* endpoints.
-# /player/* endpoints are protected by API key auth instead of rate limiting.
-#
+# this limiter is used for the /demo/* endpoints later in this file
+
 # get_real_ip() extracts the actual client IP from the X-Forwarded-For header,
-# which nginx sets when proxying requests. Without this, all requests would
-# appear to come from the nginx container IP (127.0.0.1), making per-IP
-# limiting ineffective.
+# which nginx sets when proxying requests. Without this, it seems every requests are from nginx container
 
 def get_real_ip(request: Request) -> str:
     forwarded_for = request.headers.get("X-Forwarded-For")
@@ -73,12 +62,11 @@ def get_real_ip(request: Request) -> str:
     # Fall back to the direct connection IP if the header is absent
     return request.client.host
 
-limiter = Limiter(key_func=get_real_ip)
+limiter = Limiter(key_func=get_real_ip)   # setting criteria for rate limiting (by client IP)
 app.state.limiter = limiter         # slowapi reads the limiter from app.state
-app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(SlowAPIMiddleware)  # adds the rate limiting middleware to the app
 
 # Custom handler for rate limit exceeded errors.
-# Returns 429 with a human-readable message instead of slowapi's default response.
 async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
@@ -88,21 +76,13 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # ── Demo Origin Restriction ───────────────────────────────────────────────────
-# /demo/* endpoints require no API key, so they must be restricted to requests
-# coming from the official dashboard domain only.
-# This prevents unauthorized third parties from using the demo endpoints as a
-# free alternative to the authenticated /player/* endpoints.
-#
-# Note: The Origin header is only set by browsers (CORS requests). Direct
-# requests without an Origin header (e.g., curl) are not blocked here.
-# Rate limiting handles abuse from such requests.
+# demo can be used with curl. To prevent abuse, restrict the allowed origins to the official dashboard domain.
 
 DEMO_ALLOWED_ORIGINS = {
     "https://api.ppa-dun.site",
 }
 
 # Allow an additional local origin during development if LOCAL_API_SERVER_URL
-# is set in the .env file (e.g., "http://localhost:5173").
 _local_url = os.getenv("LOCAL_API_SERVER_URL")
 if _local_url:
     DEMO_ALLOWED_ORIGINS.add(_local_url)
@@ -134,7 +114,7 @@ async def verify_api_key(request: Request, call_next):
     ):
         return await call_next(request)
 
-    # Reject requests that are missing the X-API-Key header entirely
+    # missing API key
     api_key = request.headers.get("X-API-Key")
     if not api_key:
         return JSONResponse(
@@ -142,13 +122,11 @@ async def verify_api_key(request: Request, call_next):
             content={"detail": "Missing API key"}
         )
 
-    # Look up the API key in the database.
-    # If the DB is unreachable (e.g., container restart), return 503 rather than
-    # crashing. This distinguishes infrastructure errors from auth failures.
+   # DB connection error or other unexpected error during key verification
     try:
         db = SessionLocal()
         result = db.execute(
-            text("SELECT id FROM api_keys WHERE `key` = :key"),
+            text("SELECT id FROM api_keys WHERE `key` = :key"),  # :key is a parameter placeholder to prevent SQL injection
             {"key": api_key}
         ).fetchone()
         db.close()
@@ -158,20 +136,19 @@ async def verify_api_key(request: Request, call_next):
             content={"detail": "Service unavailable"}
         )
 
-    # If no matching key was found in the DB, reject the request
+    # Invalid key (not found in DB)
     if result is None:
         return JSONResponse(
             status_code=401,
             content={"detail": "Invalid API key"}
         )
 
-    # Key is valid — pass the request to the actual route handler
+    # Key is valid
     return await call_next(request)
 
 # ── Exception Handlers ────────────────────────────────────────────────────────
-# Override FastAPI's default 422 Unprocessable Entity response for Pydantic
-# validation errors. The default response includes verbose internal field paths;
-# this handler returns a cleaner message listing only the missing field names.
+# Simple handler to return a cleaner error message instead of default FastAPI 422 error response
+# when required fields are missing in the request body.
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -185,9 +162,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-# Register the player router, which handles POST /player/value and
-# POST /player/bid. These endpoints require a valid X-API-Key header
-# (enforced by the middleware above).
+# routers from api/routers/player.py
+# which defines the /player/value and /player/bid endpoints.
 
 app.include_router(player.router)
 
@@ -199,17 +175,11 @@ def health_check():
     return {"status": "ok"}
 
 # ── Demo Endpoints ────────────────────────────────────────────────────────────
-# These endpoints call the same service functions as /player/value and
-# /player/bid, but are exposed without API key authentication.
-# This allows the dashboard frontend to demonstrate the API in the browser
-# without embedding a secret API key in client-side JavaScript.
-#
-# Security measures applied instead of API key auth:
-#   - Origin header check (check_demo_origin): only the official dashboard domain
-#   - Rate limiting (10 requests/minute per IP): prevents scripted abuse
+# demo can be used without an API key
+# to prevent abuse, rate limit is applied and allowed origins are restricted.
 
 @app.post("/demo/value")
-@limiter.limit("10/minute")
+@limiter.limit("10/minute")   # limit to 10 requests per minute per client IP
 def demo_value(request: Request, body: PlayerValueRequest):
     """
     Demo version of POST /player/value.
