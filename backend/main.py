@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from db.session import engine, Base
-from db.models import User, APIKey  # noqa: F401 — imported to register models with SQLAlchemy metadata
+from db.models import User, APIKey, ALPlayer, NLPlayer  # noqa: F401 — imported to register models with SQLAlchemy metadata
 from routers import auth
 
 # Load environment variables from .env file
