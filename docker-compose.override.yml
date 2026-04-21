@@ -1,0 +1,16 @@
+# Local-dev overrides — automatically merged with docker-compose.yml when running
+# `docker compose up`.  NOT used in prod (the server's checked-out repo doesn't
+# include this file in its compose path, since prod uses /app/cl/api/docker-compose.yml).
+#
+# Adds: source-code volume mounts for hot reload + uvicorn --reload.
+
+services:
+  api:
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./api:/app/api
+
+  backend:
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend:/app/backend

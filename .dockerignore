@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+ENV/
+
+# Git / IDE
+.git/
+.gitignore
+.gitattributes
+.github/
+.idea/
+.vscode/
+.DS_Store
+
+# Local env files (never bake secrets into image)
+.env
+.env.*
+!.env.example
+
+# Frontend (separate concern)
+frontend/
+
+# Test fixtures (not for runtime images)
+fixtures/
+fixtures.zip
+
+# Docs / README
+*.md
+docs/
+
+# Build artifacts
+*.log
+*.zip
+dist/
+build/
+*.egg-info/
+
+# OS
+Thumbs.db
