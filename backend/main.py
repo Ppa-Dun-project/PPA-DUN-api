@@ -1,18 +1,43 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from db.session import engine, Base
-from db.models import User, APIKey, ALPlayer, NLPlayer  # noqa: F401 — imported to register models with SQLAlchemy metadata
-from routers import auth
+from db.models import User, APIKey, ALPlayer, NLPlayer, UnmatchedPlayer  # noqa: F401
+from routers import auth, admin
 
-# Load environment variables from .env file
 load_dotenv()
 
-app = FastAPI(title="PPA-DUN Backend") # the server
+
+# ── Lifespan ──────────────────────────────────────────────────────────────────
+# Replaces the deprecated @app.on_event("startup") / ("shutdown") pattern.
+# On startup: create DB tables + start the daily update scheduler.
+# On shutdown: gracefully stop the scheduler.
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    Base.metadata.create_all(bind=engine)
+
+    from data.daily_update import start_scheduler
+    scheduler = start_scheduler()
+
+    yield
+
+    # Shutdown
+    if scheduler and scheduler.running:
+        scheduler.shutdown()
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
+
+app = FastAPI(title="PPA-DUN Backend", lifespan=lifespan)
 
 # ── CORS Middleware ───────────────────────────────────────────────────────────
-# Browser basically blocks frontend JavaScript from making requests to a different origin.
-# Allow all origins so the dashboard frontend
+# Allow all origins so the dashboard frontend (ppa-dun.site) and local dev
+# environments can call the backend without CORS errors.
+# The backend is only reachable through nginx, which limits exposure
+# to the public internet.
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,15 +45,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── Startup Event ─────────────────────────────────────────────────────────────
-# Runs once when the server starts.
-# create_all() checks the DB and creates any tables that do not yet exist,
-# based on the SQLAlchemy model definitions in db/models.py.
-
-@app.on_event("startup")
-def on_startup():
-    Base.metadata.create_all(bind=engine)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 # Register the auth router, which handles all /api/auth/* endpoints:
@@ -38,6 +54,8 @@ def on_startup():
 #   DELETE /api/auth/api-key/{key}   — Delete a specific API key
 
 app.include_router(auth.router)
+app.include_router(admin.router)
+
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
