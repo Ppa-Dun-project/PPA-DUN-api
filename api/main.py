@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from api.routers import player
+from api.routers import player, players_data
 from api.services.player import compute_player_value, compute_recommended_bid
 from api.models.player import PlayerValueRequest, PlayerBidRequest
 
@@ -167,6 +167,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # which defines the /player/value and /player/bid endpoints.
 
 app.include_router(player.router)
+app.include_router(players_data.router)
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
