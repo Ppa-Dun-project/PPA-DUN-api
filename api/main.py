@@ -110,6 +110,7 @@ async def verify_api_key(request: Request, call_next):
     if (
         request.url.path == "/health"
         or request.url.path.startswith("/demo")
+        or request.url.path == "/player/recalculate" # must be deleted after "FEAT-12" is done
         or request.method == "OPTIONS"
     ):
         return await call_next(request)

@@ -22,6 +22,7 @@ load_dotenv()
 from sqlalchemy.orm import Session
 from db.session import SessionLocal, engine, Base
 from db.models import ALPlayer, NLPlayer, UnmatchedPlayer
+from data.utils import normalize_name
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,24 +56,24 @@ TEAM_ABBR_MAP = {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def normalize_name(name: str) -> str:
-    """
-    Normalize a player name for matching:
-      1. Unescape SQL escape sequences (e.g. \\' → ')
-      2. Strip NFD diacritics so accented characters compare as ASCII
-      3. Lowercase and strip whitespace
+# def normalize_name(name: str) -> str:
+#     """
+#     Normalize a player name for matching:
+#       1. Unescape SQL escape sequences (e.g. \\' → ')
+#       2. Strip NFD diacritics so accented characters compare as ASCII
+#       3. Lowercase and strip whitespace
 
-    Examples:
-      "Julio Rodríguez"   → "julio rodriguez"
-      "Travis d\\'Arnaud" → "travis d'arnaud"
-      "Tyler O\\'Neill"   → "tyler o'neill"
-    """
-    name = name.replace("\\'", "'")
-    # Remove periods so "C.J." matches "CJ", "Jr." matches "Jr"
-    name = name.replace(".", "")
-    nfkd = unicodedata.normalize("NFKD", name)
-    ascii_name = "".join(c for c in nfkd if not unicodedata.combining(c))
-    return ascii_name.lower().strip()
+#     Examples:
+#       "Julio Rodríguez"   → "julio rodriguez"
+#       "Travis d\\'Arnaud" → "travis d'arnaud"
+#       "Tyler O\\'Neill"   → "tyler o'neill"
+#     """
+#     name = name.replace("\\'", "'")
+#     # Remove periods so "C.J." matches "CJ", "Jr." matches "Jr"
+#     name = name.replace(".", "")
+#     nfkd = unicodedata.normalize("NFKD", name)
+#     ascii_name = "".join(c for c in nfkd if not unicodedata.combining(c))
+#     return ascii_name.lower().strip()
 
 
 def build_match_key(name: str, team: str = "", position: str = "") -> tuple:
