@@ -121,10 +121,6 @@ def _update_players(rows: list[dict], league: str) -> tuple[int, int]:
     matched = 0
 
     try:
-        # Reset depth_order to NULL for this league's table before updating,
-        # so stale entries from yesterday do not persist.
-        db.execute(text(f"UPDATE {primary} SET depth_order = NULL"))
-
         for row in rows:
             norm        = normalize_name(row["player_name"])
             depth_order = row["depth_order"]
@@ -160,11 +156,32 @@ def _update_players(rows: list[dict], league: str) -> tuple[int, int]:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
+def _reset_depth_order() -> None:
+    """
+    Clear depth_order for both players tables before applying today's data.
+    Runs once per pipeline run so stale entries from yesterday do not persist,
+    while allowing the 30-team loop to accumulate today's values without
+    overwriting each other.
+    """
+    db = SessionLocal()
+    try:
+        db.execute(text("UPDATE players_al SET depth_order = NULL"))
+        db.execute(text("UPDATE players_nl SET depth_order = NULL"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def fetch_and_update() -> None:
     """
     Scrape ESPN depth charts for all 30 teams and update players tables.
     Called by daily_update.py.
     """
+    _reset_depth_order()
+
     total_matched   = 0
     total_unmatched = 0
     failed_teams    = []
