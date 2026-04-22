@@ -76,12 +76,17 @@ def _scrape_team(slug: str) -> list[dict]:
         if row.find(["td", "th"])
     ]
 
+    PITCHER_POSITIONS = {"P", "RP", "CL"}
+
     rows = []
     for row_idx, tr in enumerate(data_table.find_all("tr")[1:]):
         if row_idx >= len(positions):
             break
-
         position = positions[row_idx]
+
+        # Skip pitchers — players tables contain batters only
+        if position in PITCHER_POSITIONS:
+            continue
 
         for depth_order, td in enumerate(tr.find_all("td"), start=1):
             link = td.find("a", href=True)
