@@ -558,7 +558,13 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
     scarcity_adj   = adjusted_price - base_price
 
     # Step 5: compute spendable — each remaining roster slot costs at least $1
-    min_reserve = dc.my_remaining_roster_spots - 1
+    # If my_roster is provided, derive remaining spots from roster_size - len(my_roster).
+    # Otherwise, use the client-supplied my_remaining_roster_spots as-is.
+    if dc.my_roster is not None:
+        my_remaining_roster_spots = lc.roster_size - len(dc.my_roster)
+    else:
+        my_remaining_roster_spots = dc.my_remaining_roster_spots
+    min_reserve = max(0, my_remaining_roster_spots - 1)
     spendable   = max(1, dc.my_remaining_budget - min_reserve)
 
     # Step 6: max_competitor_budget
