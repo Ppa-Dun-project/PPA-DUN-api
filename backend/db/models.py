@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.session import Base  # Base is defined in db/session.py via declarative_base()
@@ -168,3 +168,31 @@ class UnmatchedPlayer(Base):
     sb         = Column(Integer,     nullable=True)
     avg        = Column(Float,       nullable=True)
     created_at = Column(DateTime,    default=datetime.utcnow)
+
+
+# ── LeagueBaseline ────────────────────────────────────────────────────────────
+# Stores per-category mean and std computed from the actual player pool.
+# Used by api/services/player.py as the baseline for z-score calculation.
+#
+# Rows are identified by (player_type, category) — this pair acts as a
+# logical unique key and is the target for upsert operations in
+# compute_baselines.py.
+#
+# player_type : "batter" or "pitcher"
+# category    : stat name — batter: R, HR, RBI, SB, AVG
+#                           pitcher: W, SV, K, ERA, WHIP
+# mean / std  : computed from non-NULL rows in players_al + players_nl
+# computed_at : UTC timestamp of the last successful computation
+
+class LeagueBaseline(Base):
+    __tablename__ = "league_baselines"
+    __table_args__ = (
+        UniqueConstraint("player_type", "category", name="uq_baseline_type_category"),
+    )
+
+    id          = Column(Integer,  primary_key=True, index=True)
+    player_type = Column(String(10),  nullable=False)   # "batter" or "pitcher"
+    category    = Column(String(10),  nullable=False)   # e.g. "HR", "ERA"
+    mean        = Column(Float,       nullable=False)
+    std         = Column(Float,       nullable=False)
+    computed_at = Column(DateTime,    nullable=False)

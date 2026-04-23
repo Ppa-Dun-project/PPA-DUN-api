@@ -10,8 +10,12 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from api.routers import player, players_data
-from api.services.player import compute_player_value, compute_recommended_bid
+from api.services.player import compute_player_value, compute_recommended_bid, reload_baselines
 from api.models.player import PlayerValueRequest, PlayerBidRequest
+from pydantic import BaseModel
+
+import logging
+logging.basicConfig(level=logging.INFO)
 
 # Load environment variables from .env file (MYSQL_ROOT_PASSWORD, MYSQL_HOST, etc.)
 load_dotenv()
@@ -110,6 +114,7 @@ async def verify_api_key(request: Request, call_next):
     if (
         request.url.path == "/health"
         or request.url.path.startswith("/demo")
+        or request.url.path.startswith("/internal")   # internal endpoints: no API key required
         or request.url.path == "/player/recalculate" # must be deleted after "FEAT-12" is done
         or request.method == "OPTIONS"
     ):
@@ -202,3 +207,22 @@ def demo_bid(request: Request, body: PlayerBidRequest):
     """
     check_demo_origin(request)
     return compute_recommended_bid(body)
+
+# ── Internal Baseline Reload ──────────────────────────────────────────────────
+# Called by backend/data/compute_baselines.py after each daily baseline
+# computation. Updates the in-memory cache in api/services/player.py.
+# This endpoint is internal-only: it is auth-exempt in the middleware above,
+# but should only be reachable within the Docker Compose network.
+
+class BaselinePayload(BaseModel):
+    batter:  dict
+    pitcher: dict
+
+@app.post("/internal/reload-baselines")
+def internal_reload_baselines(payload: BaselinePayload):
+    """
+    Receive newly computed league baselines from the backend server
+    and update the in-memory cache used for z-score calculation.
+    """
+    reload_baselines(payload.batter, payload.pitcher)
+    return {"status": "ok"}
