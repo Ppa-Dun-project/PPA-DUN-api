@@ -9,19 +9,17 @@ from api.models.player import (
     PitcherStats,
 )
 
-# ── League Baseline Constants (Roto 5x5 standard) ────────────────────────────
-# Mean and standard deviation of each scoring category across a typical
-# 12-team Roto 5x5 fantasy-relevant player pool.
-#
-# Used to compute z-scores:  z = (player_stat - mean) / std
-#
-# A player exactly at league average scores z = 0.
-# A player one standard deviation above average scores z = 1.
-#
-# Source: derived from historical MLB fantasy league data.
-# Clients do not need to provide these — they are internal constants.
+import logging
+import threading
 
-BATTER_BASELINES = {
+logger = logging.getLogger(__name__)
+
+# ── Fallback Baseline Constants ───────────────────────────────────────────────
+# Used only when the in-memory cache has not yet been populated by a push
+# from the backend server (i.e., before the first daily_update run).
+# Do NOT use these directly in algorithm logic — always call get_baselines().
+
+_BATTER_BASELINES_FALLBACK = {
     "R":   {"mean": 75.0,  "std": 20.0},
     "HR":  {"mean": 18.0,  "std": 10.0},
     "RBI": {"mean": 72.0,  "std": 20.0},
@@ -29,13 +27,54 @@ BATTER_BASELINES = {
     "AVG": {"mean": 0.260, "std": 0.025},
 }
 
-PITCHER_BASELINES = {
+_PITCHER_BASELINES_FALLBACK = {
     "W":    {"mean": 10.0,  "std": 4.0},
-    "SV":   {"mean": 10.0,  "std": 14.0},   # High std: closers skew the pool
+    "SV":   {"mean": 10.0,  "std": 14.0},
     "K":    {"mean": 130.0, "std": 50.0},
     "ERA":  {"mean": 4.00,  "std": 0.70},
     "WHIP": {"mean": 1.25,  "std": 0.15},
 }
+
+# ── In-memory baseline cache ──────────────────────────────────────────────────
+# Populated by POST /internal/reload-baselines (called from daily_update.py).
+# _baseline_lock ensures thread-safe writes since FastAPI may handle
+# concurrent requests across multiple threads.
+
+_baseline_lock  = threading.Lock()
+_batter_baselines:  dict = {}   # empty = not yet loaded; fallback will be used
+_pitcher_baselines: dict = {}
+
+
+def reload_baselines(batter: dict, pitcher: dict) -> None:
+    """
+    Replace the in-memory baseline cache with newly computed values.
+    Called by POST /internal/reload-baselines in api/main.py.
+    Thread-safe via _baseline_lock.
+    """
+    global _batter_baselines, _pitcher_baselines
+    with _baseline_lock:
+        _batter_baselines  = batter
+        _pitcher_baselines = pitcher
+    logger.info("[baselines] cache updated")
+
+
+def get_baselines(player_type: str) -> dict:
+    """
+    Return the current baseline dict for the given player_type.
+    Falls back to hardcoded constants if the cache is empty,
+    and logs a warning so the condition is visible in server logs.
+    """
+    with _baseline_lock:
+        if player_type == "batter":
+            if _batter_baselines:
+                return _batter_baselines
+            logger.warning("[baselines] batter cache empty — using fallback constants")
+            return _BATTER_BASELINES_FALLBACK
+        else:
+            if _pitcher_baselines:
+                return _pitcher_baselines
+            logger.warning("[baselines] pitcher cache empty — using fallback constants")
+            return _PITCHER_BASELINES_FALLBACK
 
 # ── Normalization Ceilings ────────────────────────────────────────────────────
 # Z_MAX_* = approximate z_total of an all-time elite player in a single season.
@@ -256,7 +295,7 @@ def _compute_z_scores(blended: dict[str, float], player_type: str) -> float:
     Returns z_total.
     """
     if player_type == "batter":
-        b = BATTER_BASELINES
+        b = get_baselines("batter")
         return (
             _zscore(blended["R"],   b["R"]["mean"],   b["R"]["std"])
             + _zscore(blended["HR"],  b["HR"]["mean"],  b["HR"]["std"])
@@ -265,7 +304,7 @@ def _compute_z_scores(blended: dict[str, float], player_type: str) -> float:
             + _zscore(blended["AVG"], b["AVG"]["mean"], b["AVG"]["std"])
         )
     else:
-        p = PITCHER_BASELINES
+        p = get_baselines("pitcher")
         return (
             _zscore(blended["W"],    p["W"]["mean"],    p["W"]["std"])
             + _zscore(blended["SV"],   p["SV"]["mean"],   p["SV"]["std"])

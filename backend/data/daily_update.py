@@ -33,6 +33,18 @@ API_RECALCULATE_URL = os.getenv(
 )
 
 
+# ── Step 0: Compute league baselines ─────────────────────────────────────────
+
+def _step_baselines() -> None:
+    from data.compute_baselines import compute_and_store, push_to_api
+    db = SessionLocal()
+    try:
+        baselines = compute_and_store(db)
+    finally:
+        db.close()
+    push_to_api(baselines)
+
+
 # ── Step 1: Injuries ──────────────────────────────────────────────────────────
 
 def _step_injuries() -> None:
@@ -149,6 +161,7 @@ def _step_recalculate() -> None:
 def run_daily_update() -> None:
     """
     Run the full daily pipeline:
+      Step 0 — Compute league baselines and push to api server
       Step 1 — Fetch and apply injury data
       Step 2 — Fetch and apply depth chart data
       Step 3 — Recalculate player_value for all players
@@ -157,6 +170,15 @@ def run_daily_update() -> None:
     start   = datetime.now()
     results = {}
     logger.info("=== Daily update started ===")
+
+    # Step 0: Baselines
+    try:
+        logger.info("[0/3] Computing league baselines...")
+        _step_baselines()
+        results["baselines"] = "OK"
+    except Exception as e:
+        logger.error(f"[0/3] Baselines failed: {e}")
+        results["baselines"] = f"FAILED: {e}"
 
     # Step 1: Injuries
     try:
