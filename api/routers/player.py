@@ -16,12 +16,18 @@ def player_value(request: PlayerValueRequest):
     """
     POST /player/value
 
-    Accepts player stats and league context, returns player_value (0.0 ~ 100.0).
+    Accepts player stats and returns player_value (0.0 ~ 100.0).
     Requires a valid X-API-Key header (enforced by the middleware in main.py).
 
-    Request body  : PlayerValueRequest  (defined in api/models/player.py)
+    Request body  : PlayerValueRequest (defined in api/models/player.py)
     Response body : PlayerValueResponse (defined in api/models/player.py)
     Business logic: compute_player_value() in api/services/player.py
+
+    PlayerValueRequest fields:
+      player_name : required — player's full name
+      position    : required — e.g. "OF", "SP", "C"
+      stats       : required — BatterStats or PitcherStats (discriminated by player_type)
+                    includes optional 3yr avg fields, age, depth_order, injury_status
     """
     return compute_player_value(request)
 
@@ -35,9 +41,16 @@ def player_bid(request: PlayerBidRequest):
     Returns both player_value (0.0 ~ 100.0) and recommended_bid (integer $).
     Requires a valid X-API-Key header (enforced by the middleware in main.py).
 
-    Request body  : PlayerBidRequest  (PlayerValueRequest + league_context + draft_context)
+    Request body  : PlayerBidRequest (defined in api/models/player.py)
     Response body : PlayerBidResponse (defined in api/models/player.py)
     Business logic: compute_recommended_bid() in api/services/player.py
+
+    PlayerBidRequest fields:
+      player_name    : required — player's full name
+      position       : required — e.g. "OF", "SP", "C"
+      stats          : required — BatterStats or PitcherStats
+      league_context : required — league_size, roster_size, total_budget
+      draft_context  : required — see below
 
     DraftContext fields:
       my_remaining_budget       : required — client's current remaining budget

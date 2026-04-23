@@ -497,7 +497,7 @@ def compute_player_value(request: PlayerValueRequest) -> PlayerValueResponse:
 
 # ── Core Function 2: recommended_bid ─────────────────────────────────────────
 
-def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
+def compute_recommended_bid(request: PlayerBidRequest, player_value: float | None = None) -> PlayerBidResponse:
     """
     Compute recommended_bid (integer dollar amount) for auction drafts.
 
@@ -517,15 +517,16 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
                                        1, min(spendable, max_competitor_budget))
     """
     # Step 1: reuse the player_value pipeline
-    value_response = compute_player_value(
-        PlayerValueRequest(
-            player_name=request.player_name,
-            position=request.position,
-            stats=request.stats,
+    if player_value is None:
+        value_response = compute_player_value(
+            PlayerValueRequest(
+                player_name=request.player_name,
+                position=request.position,
+                stats=request.stats,
+            )
         )
-    )
-    player_value = value_response.player_value
-    player_type  = request.stats.player_type
+        player_value = value_response.player_value
+    player_type = request.stats.player_type
 
     lc  = request.league_context
     dc  = request.draft_context

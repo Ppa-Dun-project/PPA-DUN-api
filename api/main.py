@@ -108,6 +108,10 @@ def check_demo_origin(request: Request):
 #   - /demo/*          : demo endpoints (auth-exempt by design)
 #   - OPTIONS requests : CORS preflight requests must pass through
 
+# Internal API key for backend → api server communication (daily_update.py)
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
+
+
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
     # Skip auth for exempt paths
@@ -127,6 +131,10 @@ async def verify_api_key(request: Request, call_next):
             status_code=401,
             content={"detail": "Missing API key"}
         )
+    
+    # Allow internal API key without DB lookup
+    if INTERNAL_API_KEY and api_key == INTERNAL_API_KEY:
+        return await call_next(request)
 
    # DB connection error or other unexpected error during key verification
     try:

@@ -159,3 +159,45 @@ class PlayerBidResponse(BaseModel):
     player_value:    float           # 0.0 ~ 100.0
     recommended_bid: int             # integer dollar amount
     bid_breakdown:   BidBreakdown
+
+
+# ── player_name Based Bid Models ──────────────────────────────────────────────
+
+class PlayerBidByNameRequest(BaseModel):
+    player_name:    str
+    league_context: LeagueContext
+    draft_context:  DraftContext
+
+
+class BatterStatsSnapshot(BaseModel):
+    """Batter stat fields returned in PlayerBidByNameResponse."""
+    ab:  int   | None
+    r:   int   | None
+    hr:  int   | None
+    rbi: int   | None
+    sb:  int   | None
+    cs:  int   | None
+    avg: float | None
+
+
+class PitcherStatsSnapshot(BaseModel):
+    """Pitcher stat fields returned in PlayerBidByNameResponse."""
+    ip:   float | None
+    w:    int   | None
+    sv:   int   | None
+    k:    int   | None
+    era:  float | None
+    whip: float | None
+
+
+class PlayerBidByNameResponse(BaseModel):
+    player_name:    str
+    player_type:    str             # "batter" or "pitcher"
+    position:       str
+    team:           str
+    stats:          BatterStatsSnapshot | PitcherStatsSnapshot
+    injury_status:  str  | None
+    depth_order:    int  | None
+    player_value:   float           # stored value from DB
+    recommended_bid: int
+    bid_breakdown:  BidBreakdown
