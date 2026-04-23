@@ -90,7 +90,6 @@ class RosterEntry(BaseModel):
 class DraftContext(BaseModel):
     my_remaining_budget:       int
     my_remaining_roster_spots: int
-    my_positions_filled:       list[str]
     drafted_players_count:     int
 
     # Optional: full roster state for dynamic scarcity bonus (ALG-03)

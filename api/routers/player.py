@@ -35,9 +35,19 @@ def player_bid(request: PlayerBidRequest):
     Returns both player_value (0.0 ~ 100.0) and recommended_bid (integer $).
     Requires a valid X-API-Key header (enforced by the middleware in main.py).
 
-    Request body  : PlayerBidRequest  (PlayerValueRequest + draft_context)
+    Request body  : PlayerBidRequest  (PlayerValueRequest + league_context + draft_context)
     Response body : PlayerBidResponse (defined in api/models/player.py)
     Business logic: compute_recommended_bid() in api/services/player.py
+
+    DraftContext fields:
+      my_remaining_budget       : required — client's current remaining budget
+      my_remaining_roster_spots : required — used as fallback when my_roster is None
+      drafted_players_count     : required — total players drafted across all teams
+      my_roster                 : optional — list of {player_name, position};
+                                  when provided, my_remaining_roster_spots is
+                                  derived as roster_size - len(my_roster)
+      opponent_rosters          : optional — used for dynamic scarcity bonus (ALG-03)
+      opponent_budgets          : optional — used for competitor budget cap (ALG-04)
     """
     return compute_recommended_bid(request)
 
