@@ -98,6 +98,10 @@ class DraftContext(BaseModel):
     my_roster:         list[RosterEntry]        | None = None
     opponent_rosters:  dict[str, list[RosterEntry]] | None = None
 
+    # Optional: remaining budget per opponent for bid cap (ALG-04)
+    # Key = opponent team name (must match keys in opponent_rosters if provided)
+    opponent_budgets: dict[str, int] | None = None
+
 
 # ── Request Models ────────────────────────────────────────────────────────────
 # stats field uses a discriminated union on player_type.
@@ -138,6 +142,7 @@ class BidBreakdown(BaseModel):
     scarcity_adjustment: float    # dollar adjustment from positional scarcity
     draft_adjustment:    float    # dollar adjustment from draft state
     max_spendable:       int      # maximum the user can spend right now
+    max_competitor_budget:  int     # max budget among competing opponents; equals max_spendable if opponent_budgets not provided
 
 
 # ── Response Models ───────────────────────────────────────────────────────────
