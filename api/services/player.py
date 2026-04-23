@@ -502,16 +502,19 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
     Compute recommended_bid (integer dollar amount) for auction drafts.
 
     Full pipeline:
-      Step 1 — player_value   = reuse compute_player_value()
-      Step 2 — base_price     = (player_value / 100) * total_budget * HIT_PITCH_RATIO
-      Step 3 — dynamic_bonus  = _get_dynamic_scarcity_bonus()
-               early-exit     → recommended_bid = 1 if competitors_at_pos == 0
-      Step 4 — adjusted_price = base_price * scarcity_multiplier
-      Step 5 — spendable      = my_remaining_budget - (my_remaining_roster_spots - 1)
-      Step 6 — draft_progress = drafted_players_count / (league_size * roster_size)
-               budget_ratio   = spendable / my_remaining_budget
-               draft_multiplier = 1.0 + (budget_ratio - 0.5) * 0.2 * draft_progress
-      Step 7 — recommended_bid = clip(round(adjusted_price * draft_multiplier), 1, spendable)
+      Step 1 — player_value    = reuse compute_player_value()
+      Step 2 — base_price      = (player_value / 100) * total_budget * HIT_PITCH_RATIO
+      Step 3 — dynamic_bonus   = _get_dynamic_scarcity_bonus()
+               early-exit      → recommended_bid = 1 if competitors_at_pos == 0
+      Step 4 — adjusted_price  = base_price * scarcity_multiplier
+      Step 5 — spendable       = my_remaining_budget - (my_remaining_roster_spots - 1)
+      Step 6 — max_competitor_budget:
+               competing_opponents = opponents who have not yet filled target position
+               max_competitor_budget = max(their remaining budgets)
+               falls back to spendable if opponent_budgets not provided
+      Step 7 — draft_progress adjustment
+      Step 8 — recommended_bid = clip(round(adjusted_price * draft_multiplier),
+                                       1, min(spendable, max_competitor_budget))
     """
     # Step 1: reuse the player_value pipeline
     value_response = compute_player_value(
@@ -535,7 +538,6 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
     # Step 3: dynamic scarcity bonus + early-exit check
     _, competitors_at_pos = _get_dynamic_scarcity_bonus(pos, dc.opponent_rosters)
     if competitors_at_pos == 0:
-        # No competitors need this position — minimal bid
         return PlayerBidResponse(
             player_name=request.player_name,
             player_type=player_type,
@@ -546,6 +548,7 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
                 scarcity_adjustment=0.0,
                 draft_adjustment=0.0,
                 max_spendable=1,
+                max_competitor_budget=1,
             ),
         )
 
@@ -558,15 +561,55 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
     min_reserve = dc.my_remaining_roster_spots - 1
     spendable   = max(1, dc.my_remaining_budget - min_reserve)
 
-    # Step 6: draft progress adjustment
+    # Step 6: max_competitor_budget
+    # Determine which opponents are still competing for this position,
+    # then find the maximum remaining budget among them.
+    if dc.opponent_budgets is None:
+        # No budget data provided — no competitor cap applied
+        max_competitor_budget = spendable
+    else:
+        if dc.opponent_rosters is not None:
+            # Filter to opponents who have NOT yet filled the target position
+            competing_opponents = [
+                name for name, roster in dc.opponent_rosters.items()
+                if not any(entry.position.upper() == pos for entry in roster)
+            ]
+        else:
+            # No roster data — treat all opponents as competing
+            competing_opponents = list(dc.opponent_budgets.keys())
+
+        if not competing_opponents:
+            # All opponents already have this position filled — minimal bid
+            return PlayerBidResponse(
+                player_name=request.player_name,
+                player_type=player_type,
+                player_value=player_value,
+                recommended_bid=1,
+                bid_breakdown=BidBreakdown(
+                    base_price=round(base_price, 2),
+                    scarcity_adjustment=round(scarcity_adj, 2),
+                    draft_adjustment=0.0,
+                    max_spendable=spendable,
+                    max_competitor_budget=1,
+                ),
+            )
+
+        max_competitor_budget = max(
+            dc.opponent_budgets.get(name, 0) for name in competing_opponents
+        )
+        # Ensure at least 1 to avoid clipping recommended_bid below minimum
+        max_competitor_budget = max(1, max_competitor_budget)
+
+    # Step 7: draft progress adjustment
     draft_progress   = dc.drafted_players_count / (lc.league_size * lc.roster_size)
     budget_ratio     = spendable / dc.my_remaining_budget if dc.my_remaining_budget > 0 else 0.5
     draft_multiplier = 1.0 + (budget_ratio - 0.5) * 0.2 * draft_progress
     draft_adj        = adjusted_price * draft_multiplier - adjusted_price
 
-    # Step 7: clip to [1, spendable]
+    # Step 8: clip to [1, min(spendable, max_competitor_budget)]
+    effective_cap   = min(spendable, max_competitor_budget)
     raw_bid         = adjusted_price * draft_multiplier
-    recommended_bid = max(1, min(spendable, round(raw_bid)))
+    recommended_bid = max(1, min(effective_cap, round(raw_bid)))
 
     return PlayerBidResponse(
         player_name=request.player_name,
@@ -574,9 +617,10 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
         player_value=player_value,
         recommended_bid=recommended_bid,
         bid_breakdown=BidBreakdown(
-            base_price=round(base_price,   2),
-            scarcity_adjustment=round(scarcity_adj, 2),
-            draft_adjustment=round(draft_adj,    2),
+            base_price=round(base_price,        2),
+            scarcity_adjustment=round(scarcity_adj,  2),
+            draft_adjustment=round(draft_adj,       2),
             max_spendable=spendable,
+            max_competitor_budget=max_competitor_budget,
         ),
     )
