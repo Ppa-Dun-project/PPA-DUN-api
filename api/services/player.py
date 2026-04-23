@@ -9,18 +9,17 @@ from api.models.player import (
     PitcherStats,
 )
 
-# ── League Baseline Constants (Roto 5x5 standard) ───────────────────────────
-# These values represent the mean and standard deviation of each scoring
-# category across a typical 12-team Roto 5x5 fantasy-relevant player pool.
+# ── League Baseline Constants (Roto 5x5 standard) ────────────────────────────
+# Mean and standard deviation of each scoring category across a typical
+# 12-team Roto 5x5 fantasy-relevant player pool.
 #
-# They are used to compute z-scores:
-#   z = (player_stat - mean) / std
+# Used to compute z-scores:  z = (player_stat - mean) / std
 #
 # A player exactly at league average scores z = 0.
 # A player one standard deviation above average scores z = 1.
 #
 # Source: derived from historical MLB fantasy league data.
-# These are internal constants — clients do not need to provide them.
+# Clients do not need to provide these — they are internal constants.
 
 BATTER_BASELINES = {
     "R":   {"mean": 75.0,  "std": 20.0},
@@ -32,24 +31,23 @@ BATTER_BASELINES = {
 
 PITCHER_BASELINES = {
     "W":    {"mean": 10.0,  "std": 4.0},
-    "SV":   {"mean": 10.0,  "std": 14.0},  # High std because closers skew the pool
+    "SV":   {"mean": 10.0,  "std": 14.0},   # High std: closers skew the pool
     "K":    {"mean": 130.0, "std": 50.0},
     "ERA":  {"mean": 4.00,  "std": 0.70},
     "WHIP": {"mean": 1.25,  "std": 0.15},
 }
 
-# ── Normalization Ceilings ───────────────────────────────────────────────────
+# ── Normalization Ceilings ────────────────────────────────────────────────────
 # Z_MAX_* = approximate z_total of an all-time elite player in a single season.
-# RAW_MAX  = Z_MAX + maximum possible position_bonus (C = +1.5 → RAW_MAX = 11.5,
+# RAW_MAX  = Z_MAX + maximum possible position_bonus (C = +1.5 → 11.5,
 #            rounded up to 12.0 for headroom).
-# These are used to scale raw scores into the [0.0, 100.0] range.
 # Values above the ceiling are clipped to 100.0.
 
 Z_MAX_BATTER  = 10.0
 Z_MAX_PITCHER = 10.0
 RAW_MAX       = 12.0
 
-# ── Hitter / Pitcher Budget Split ────────────────────────────────────────────
+# ── Hitter / Pitcher Budget Split ─────────────────────────────────────────────
 # Standard Roto 5x5 auction convention: ~67% of budget goes to batters,
 # ~33% to pitchers. Used in base_price calculation.
 
@@ -58,53 +56,85 @@ HIT_PITCH_RATIO = {
     "pitcher": 0.33,
 }
 
-# ── Positional Scarcity Bonus ────────────────────────────────────────────────
+# ── Positional Scarcity Bonus ─────────────────────────────────────────────────
 # Added to z_total (in z-score units) before normalization.
-# Reflects the fact that scarce positions (C, SS) carry extra value even when
-# raw stats are equal to a less scarce position (1B, OF).
-# A catcher at league-average batting is worth more than a first baseman at
-# the same stats because elite catchers are much harder to find.
+# Reflects the fact that scarce positions (C, SS) carry extra value
+# even when raw stats are equal to a less scarce position (1B, OF).
 
 POSITION_BONUS = {
-    "C":  1.5,   # Fewest quality options; highest scarcity in the player pool
-    "SS": 0.8,   # Historically thin talent pool
-    "RP": 0.6,   # Saves are scarce; role instability adds a value premium
-    "CL": 0.6,   # Treated same as RP
-    "SP": 0.4,   # Quality depth exists but elite SPs still command a premium
-    "2B": 0.5,   # Moderately scarce
-    "3B": 0.3,   # Slight scarcity
-    "1B": 0.0,   # Deepest positions; no scarcity premium
+    "C":  1.5,
+    "SS": 0.8,
+    "RP": 0.6,
+    "CL": 0.6,
+    "SP": 0.4,
+    "2B": 0.5,
+    "3B": 0.3,
+    "1B": 0.0,
     "OF": 0.0,
     "DH": 0.0,
 }
 
-# ── Positional Scarcity Multiplier ───────────────────────────────────────────
+# ── Positional Scarcity Multiplier ────────────────────────────────────────────
 # Applied to base_price (in dollars) during bid calculation.
 # Separate from POSITION_BONUS — this multiplier directly inflates the dollar
-# bid to reflect real auction market behavior where C and SS prices carry
-# visible premiums over their raw stat contribution.
+# bid to reflect real auction market behavior.
 
 SCARCITY_MULTIPLIER = {
-    "C":  1.15,   # +15% bid premium
-    "SS": 1.08,   # +8%
-    "2B": 1.05,   # +5%
+    "C":  1.15,
+    "SS": 1.08,
+    "2B": 1.05,
     "SP": 1.05,
     "RP": 1.05,
     "CL": 1.05,
-    "3B": 1.02,   # +2%
-    "1B": 1.00,   # No adjustment
+    "3B": 1.02,
+    "1B": 1.00,
     "OF": 1.00,
     "DH": 1.00,
 }
 
+# ── Age Factor Table ──────────────────────────────────────────────────────────
+# Applied to blended_stat before z-score calculation (STEP B).
+# Reflects career trajectory: young players have upside, older players decline.
 
-# ── Internal Helpers ─────────────────────────────────────────────────────────
+AGE_FACTOR_TABLE = [
+    (25, 1.05),   # 25 and under: growth potential
+    (30, 1.00),   # 26~30: prime years
+    (33, 0.95),   # 31~33: early decline
+]
+AGE_FACTOR_DEFAULT = 0.90   # 34 and older: decline phase
+AGE_FACTOR_UNKNOWN = 1.00   # age not provided: no adjustment
+
+# ── Depth Factor Table ────────────────────────────────────────────────────────
+# Applied to blended_stat before z-score calculation (STEP C).
+# Reflects expected playing time based on depth chart position.
+
+DEPTH_FACTOR_TABLE = {
+    1: 1.00,   # starter: full playing time expected
+    2: 0.90,   # near-starter: semi-regular
+    3: 0.75,   # platoon candidate
+}
+DEPTH_FACTOR_DEFAULT = 0.60   # 4 or deeper: limited role
+DEPTH_FACTOR_UNKNOWN = 1.00   # depth_order not provided: no adjustment
+
+# ── Injury Penalty Table ──────────────────────────────────────────────────────
+# Subtracted from z_total as part of risk penalty (STEP G / ALG-03).
+# Uses canonical ESPN status strings stored in the DB.
+
+INJURY_PENALTY = {
+    "Day-To-Day": 0.1,
+    "10-Day IL":  0.3,
+    "15-Day IL":  0.4,
+    "60-Day IL":  0.7,
+    "Out":        1.0,
+}
+
+
+# ── Internal Helpers ──────────────────────────────────────────────────────────
 
 def _zscore(value: float, mean: float, std: float) -> float:
     """
     Compute the z-score of a single statistic.
     Returns 0.0 if std is 0 to prevent ZeroDivisionError.
-
     Formula: z = (value - mean) / std
     """
     if std == 0:
@@ -114,120 +144,232 @@ def _zscore(value: float, mean: float, std: float) -> float:
 
 def _normalize(value: float, max_val: float) -> float:
     """
-    Scale a raw value to the [0.0, 100.0] range using a linear mapping,
-    then clip to ensure the result never falls outside the boundary.
-
+    Scale a raw value to the [0.0, 100.0] range and clip to boundary.
     Formula: scaled = clip((value / max_val) * 100, 0, 100)
     """
     if max_val == 0:
         return 0.0
-    scaled = (value / max_val) * 100.0
-    return max(0.0, min(100.0, scaled))
+    return max(0.0, min(100.0, (value / max_val) * 100.0))
 
 
-def _compute_z_scores(stats: BatterStats | PitcherStats, player_type: str) -> float:
+def _get_age_factor(age: int | None) -> float:
     """
-    Sum z-scores across all 5 Roto categories for the given player type.
+    Return the age adjustment factor for blended_stat (STEP B).
+    Iterates the AGE_FACTOR_TABLE in ascending order and returns the factor
+    for the first threshold the player's age does not exceed.
+    Falls back to AGE_FACTOR_DEFAULT (0.90) for players 34 and older.
+    Returns AGE_FACTOR_UNKNOWN (1.00) when age is not provided.
+    """
+    if age is None:
+        return AGE_FACTOR_UNKNOWN
+    for max_age, factor in AGE_FACTOR_TABLE:
+        if age <= max_age:
+            return factor
+    return AGE_FACTOR_DEFAULT
+
+
+def _get_depth_factor(depth_order: int | None) -> float:
+    """
+    Return the depth chart adjustment factor for blended_stat (STEP C).
+    Returns DEPTH_FACTOR_UNKNOWN (1.00) when depth_order is not provided.
+    Returns DEPTH_FACTOR_DEFAULT (0.60) for depth_order >= 4.
+    """
+    if depth_order is None:
+        return DEPTH_FACTOR_UNKNOWN
+    return DEPTH_FACTOR_TABLE.get(depth_order, DEPTH_FACTOR_DEFAULT)
+
+
+# ── STEP A: Stat Blending ─────────────────────────────────────────────────────
+
+def _blend_stats(stats: BatterStats | PitcherStats) -> dict[str, float]:
+    """
+    Blend stats_current and stats_3yr_avg at a 6:4 ratio (STEP A).
+    Returns a dict mapping stat name → blended value.
+
+    If any 3-year average field is None (i.e. not provided), the current
+    season stat is used as-is for that field. This allows partial 3yr data
+    to be provided without breaking the pipeline.
+
+    Formula: blended = (0.6 * current) + (0.4 * avg_3yr)
+    """
+    if isinstance(stats, BatterStats):
+        return {
+            "R":   0.6 * stats.R   + 0.4 * (stats.R_3yr   if stats.R_3yr   is not None else stats.R),
+            "HR":  0.6 * stats.HR  + 0.4 * (stats.HR_3yr  if stats.HR_3yr  is not None else stats.HR),
+            "RBI": 0.6 * stats.RBI + 0.4 * (stats.RBI_3yr if stats.RBI_3yr is not None else stats.RBI),
+            "SB":  0.6 * stats.SB  + 0.4 * (stats.SB_3yr  if stats.SB_3yr  is not None else stats.SB),
+            "AVG": 0.6 * stats.AVG + 0.4 * (stats.AVG_3yr if stats.AVG_3yr is not None else stats.AVG),
+            # AB and CS are used in risk penalty, not z-score; pass through current values
+            "AB":  float(stats.AB),
+            "CS":  float(stats.CS),
+        }
+    else:  # PitcherStats
+        return {
+            "W":    0.6 * stats.W    + 0.4 * (stats.W_3yr    if stats.W_3yr    is not None else stats.W),
+            "SV":   0.6 * stats.SV   + 0.4 * (stats.SV_3yr   if stats.SV_3yr   is not None else stats.SV),
+            "K":    0.6 * stats.K    + 0.4 * (stats.K_3yr     if stats.K_3yr    is not None else stats.K),
+            "ERA":  0.6 * stats.ERA  + 0.4 * (stats.ERA_3yr  if stats.ERA_3yr  is not None else stats.ERA),
+            "WHIP": 0.6 * stats.WHIP + 0.4 * (stats.WHIP_3yr if stats.WHIP_3yr is not None else stats.WHIP),
+            # IP is used in risk penalty, not z-score; pass through current value
+            "IP":   stats.IP,
+        }
+
+
+# ── STEP B + C: Age and Depth Adjustment ─────────────────────────────────────
+
+def _apply_adjustments(
+    blended: dict[str, float],
+    age: int | None,
+    depth_order: int | None,
+    player_type: str,
+) -> dict[str, float]:
+    age_factor   = _get_age_factor(age)
+    depth_factor = _get_depth_factor(depth_order)
+
+    # Rate stats are excluded from depth_factor — multiplying AVG/ERA/WHIP
+    # by a playing-time proxy produces nonsensical results.
+    # Age factor still applies to rate stats (reflects skill trajectory).
+    DEPTH_EXCLUDE = {"AVG", "ERA", "WHIP"}
+    # Always exclude from both adjustments (used only for risk penalty)
+    BOTH_EXCLUDE  = {"AB", "CS", "IP"}
+
+    result = {}
+    for k, v in blended.items():
+        if k in BOTH_EXCLUDE:
+            result[k] = v
+        elif k in DEPTH_EXCLUDE:
+            result[k] = v * age_factor        # age only, no depth
+        else:
+            result[k] = v * age_factor * depth_factor   # both
+    return result
+
+
+# ── STEP E: Z-Score Calculation ───────────────────────────────────────────────
+
+def _compute_z_scores(blended: dict[str, float], player_type: str) -> float:
+    """
+    Sum z-scores across all 5 Roto categories using the blended stat dict.
 
     Batters:  R + HR + RBI + SB + AVG  (all higher = better)
-    Pitchers: W + SV + K - ERA - WHIP  (ERA and WHIP are negated because
-              lower values are better; negating the z-score flips the sign
-              so that a below-average ERA yields a positive contribution)
+    Pitchers: W + SV + K - ERA - WHIP  (ERA and WHIP negated: lower = better)
 
-    Returns z_total: the sum of all 5 category z-scores.
-    An elite player typically scores z_total >> 0.
-    A replacement-level player typically scores z_total < 0.
+    Returns z_total.
     """
     if player_type == "batter":
         b = BATTER_BASELINES
-        z_total = (
-            _zscore(stats.R,   b["R"]["mean"],   b["R"]["std"])
-            + _zscore(stats.HR,  b["HR"]["mean"],  b["HR"]["std"])
-            + _zscore(stats.RBI, b["RBI"]["mean"], b["RBI"]["std"])
-            + _zscore(stats.SB,  b["SB"]["mean"],  b["SB"]["std"])
-            + _zscore(stats.AVG, b["AVG"]["mean"], b["AVG"]["std"])
+        return (
+            _zscore(blended["R"],   b["R"]["mean"],   b["R"]["std"])
+            + _zscore(blended["HR"],  b["HR"]["mean"],  b["HR"]["std"])
+            + _zscore(blended["RBI"], b["RBI"]["mean"], b["RBI"]["std"])
+            + _zscore(blended["SB"],  b["SB"]["mean"],  b["SB"]["std"])
+            + _zscore(blended["AVG"], b["AVG"]["mean"], b["AVG"]["std"])
         )
     else:
         p = PITCHER_BASELINES
-        # Negate ERA and WHIP z-scores: lower stat value → higher fantasy value
-        z_total = (
-            _zscore(stats.W,    p["W"]["mean"],    p["W"]["std"])
-            + _zscore(stats.SV,   p["SV"]["mean"],   p["SV"]["std"])
-            + _zscore(stats.K,    p["K"]["mean"],    p["K"]["std"])
-            - _zscore(stats.ERA,  p["ERA"]["mean"],  p["ERA"]["std"])
-            - _zscore(stats.WHIP, p["WHIP"]["mean"], p["WHIP"]["std"])
+        return (
+            _zscore(blended["W"],    p["W"]["mean"],    p["W"]["std"])
+            + _zscore(blended["SV"],   p["SV"]["mean"],   p["SV"]["std"])
+            + _zscore(blended["K"],    p["K"]["mean"],    p["K"]["std"])
+            - _zscore(blended["ERA"],  p["ERA"]["mean"],  p["ERA"]["std"])
+            - _zscore(blended["WHIP"], p["WHIP"]["mean"], p["WHIP"]["std"])
         )
-    return z_total
 
+
+# ── STEP F: Positional Scarcity Bonus ────────────────────────────────────────
 
 def _get_position_bonus(position: str) -> float:
     """
-    Return the positional scarcity bonus (in z-score units) for the given
-    position string. Defaults to 0.0 for unrecognized positions.
+    Return the positional scarcity bonus (in z-score units).
+    Defaults to 0.0 for unrecognized positions.
     """
     return POSITION_BONUS.get(position.upper(), 0.0)
 
 
-def _get_risk_penalty(stats: BatterStats | PitcherStats, player_type: str) -> float:
-    """
-    Compute the total risk penalty (in z-score units) based on conditions
-    that reduce the reliability of a player's expected output.
+# ── STEP G: Risk Penalty ──────────────────────────────────────────────────────
 
-    All conditions are evaluated independently — multiple penalties can
-    stack if more than one condition is met simultaneously.
+def _get_risk_penalty(stats: BatterStats | PitcherStats, blended: dict[str, float]) -> float:
+    """
+    Compute the total risk penalty (in z-score units).
+    All conditions are evaluated independently and summed.
 
     Batter conditions:
-      - AB < 300       : insufficient playing time, high variance  → -0.5
-      - CS/(SB+CS) > 0.35 : poor stolen base efficiency           → -0.2
+      - AB < 300              : insufficient playing time            → -0.5
+      - CS/(SB+CS) > 0.35    : poor stolen base efficiency          → -0.2
 
     Pitcher conditions:
-      - IP < 100       : insufficient innings, likely part-time    → -0.5
-      - ERA > 4.50     : ERA above this threshold hurts roto standings → -0.3
+      - IP < 100              : insufficient innings                 → -0.5
+      - ERA > 4.50            : ERA above roto-relevant threshold    → -0.3
+
+    Injury conditions (all player types):
+      - Day-To-Day            : short-term absence                   → -0.1
+      - 10-Day IL             : short-term IL                        → -0.3
+      - 15-Day IL             : mid-term IL                          → -0.4
+      - 60-Day IL             : long-term IL                         → -0.7
+      - Out                   : season-ending                        → -1.0
+
+    AB, CS, IP values are taken from blended dict (pass-through, not adjusted).
+    ERA is taken from blended dict (adjusted).
     """
     penalty = 0.0
 
-    if player_type == "batter":
-        if stats.AB < 300:
+    if isinstance(stats, BatterStats):
+        if blended["AB"] < 300:
             penalty += 0.5
-        total_attempts = stats.SB + stats.CS
-        # Guard against division by zero when a player has 0 SB and 0 CS
-        if total_attempts > 0 and (stats.CS / total_attempts) > 0.35:
+        total_attempts = blended["SB"] + blended["CS"] if "SB" in blended else stats.SB + stats.CS
+        cs  = blended.get("CS", stats.CS)
+        sb  = blended.get("SB", stats.SB)
+        tot = sb + cs
+        if tot > 0 and (cs / tot) > 0.35:
             penalty += 0.2
-
-    else:  # pitcher
-        if stats.IP < 100:
+    else:
+        if blended["IP"] < 100:
             penalty += 0.5
-        if stats.ERA > 4.50:
+        if blended["ERA"] > 4.50:
             penalty += 0.3
+
+    # Injury penalty (applicable to all player types)
+    injury_status = stats.injury_status
+    if injury_status and injury_status in INJURY_PENALTY:
+        penalty += INJURY_PENALTY[injury_status]
 
     return penalty
 
 
-# ── Core Function 1: player_value ────────────────────────────────────────────
+# ── Core Function 1: player_value ─────────────────────────────────────────────
 
 def compute_player_value(request: PlayerValueRequest) -> PlayerValueResponse:
     """
     Compute player_value (0.0 ~ 100.0) using the Roto 5x5 FVARz algorithm.
 
     Full pipeline:
-      Step 1 — z_total      = sum of z-scores across 5 roto categories
-      Step 2 — position_bonus = scarcity bonus for the player's position (z units)
-      Step 3 — risk_penalty   = stacked risk deductions (z units)
-      Step 4 — raw_score    = z_total + position_bonus - risk_penalty
-      Step 5 — stat_score   = normalize(z_total,   Z_MAX)   → 0~100 (stats only)
-      Step 6 — player_value = normalize(raw_score, RAW_MAX) → 0~100 (final)
-
-    stat_score is included in value_breakdown to show the pure stat contribution
-    before bonuses and penalties are applied.
-    position_bonus and risk_penalty are scaled to 0~100 for readability in the
-    response breakdown, but internally they are in z-score units.
+      STEP A — Blend stats_current and stats_3yr_avg (6:4 ratio)
+      STEP B — Apply age_factor to blended stats
+      STEP C — Apply depth_factor to blended stats
+      STEP E — Compute z_total from adjusted blended stats
+      STEP F — Add positional scarcity bonus
+      STEP G — Subtract risk penalty
+      STEP H — Normalize raw_score to [0.0, 100.0]
     """
-    z_max = Z_MAX_BATTER if request.player_type == "batter" else Z_MAX_PITCHER
+    stats       = request.stats
+    player_type = stats.player_type
 
-    z_total        = _compute_z_scores(request.stats, request.player_type)
+    # STEP A: blend current season and 3-year average stats
+    blended = _blend_stats(stats)
+
+    # STEP B + C: apply age and depth chart adjustments
+    blended = _apply_adjustments(blended, stats.age, stats.depth_order, player_type)
+
+    # STEP E: compute z-scores from adjusted blended stats
+    z_total = _compute_z_scores(blended, player_type)
+
+    # STEP F: positional scarcity bonus
     position_bonus = _get_position_bonus(request.position)
-    risk_penalty   = _get_risk_penalty(request.stats, request.player_type)
 
+    # STEP G: risk penalty
+    risk_penalty = _get_risk_penalty(stats, blended)
+
+    # STEP H: normalize to [0.0, 100.0]
+    z_max        = Z_MAX_BATTER if player_type == "batter" else Z_MAX_PITCHER
     raw_score    = z_total + position_bonus - risk_penalty
     stat_score   = _normalize(z_total,   z_max)
     player_value = _normalize(raw_score, RAW_MAX)
@@ -238,7 +380,7 @@ def compute_player_value(request: PlayerValueRequest) -> PlayerValueResponse:
 
     return PlayerValueResponse(
         player_name=request.player_name,
-        player_type=request.player_type,
+        player_type=player_type,
         player_value=round(player_value, 1),
         value_breakdown=ValueBreakdown(
             stat_score=round(stat_score,     1),
@@ -259,70 +401,58 @@ def compute_recommended_bid(request: PlayerBidRequest) -> PlayerBidResponse:
       Step 2 — base_price     = (player_value / 100) * total_budget * HIT_PITCH_RATIO
       Step 3 — adjusted_price = base_price * scarcity_multiplier
       Step 4 — spendable      = my_remaining_budget - (my_remaining_roster_spots - 1)
-                                (each unfilled slot must cost at least $1)
       Step 5 — draft_progress = drafted_players_count / (league_size * roster_size)
                budget_ratio   = spendable / my_remaining_budget
                draft_multiplier = 1.0 + (budget_ratio - 0.5) * 0.2 * draft_progress
-                 → budget_ratio > 0.5: plenty of budget → multiplier > 1.0 → bid UP
-                 → budget_ratio < 0.5: budget is tight  → multiplier < 1.0 → bid DOWN
-                 → draft_progress scales the effect: stronger adjustment late in draft
       Step 6 — recommended_bid = clip(round(adjusted_price * draft_multiplier), 1, spendable)
     """
-    # Step 1: reuse the player_value pipeline rather than duplicating logic
+    # Step 1: reuse the player_value pipeline
     value_response = compute_player_value(
         PlayerValueRequest(
             player_name=request.player_name,
-            player_type=request.player_type,
             position=request.position,
             stats=request.stats,
-            league_context=request.league_context,
         )
     )
     player_value = value_response.player_value
+    player_type  = request.stats.player_type
 
     lc  = request.league_context
     dc  = request.draft_context
     pos = request.position.upper()
 
-    # Step 2: base price — proportional to player value and total league budget
-    ratio      = HIT_PITCH_RATIO.get(request.player_type, 0.5)
+    # Step 2: base price proportional to player value and total league budget
+    ratio      = HIT_PITCH_RATIO.get(player_type, 0.5)
     base_price = (player_value / 100.0) * lc.total_budget * ratio
 
-    # Step 3: apply positional scarcity multiplier to inflate bid for scarce positions
+    # Step 3: apply positional scarcity multiplier
     multiplier     = SCARCITY_MULTIPLIER.get(pos, 1.0)
     adjusted_price = base_price * multiplier
-    scarcity_adj   = adjusted_price - base_price  # dollar amount added by scarcity
+    scarcity_adj   = adjusted_price - base_price
 
-    # Step 4: compute the hard ceiling on what the user can spend on a single player.
-    # Each remaining unfilled roster slot must cost at least $1 at auction,
-    # so the maximum spendable amount on this player is budget minus those reserves.
+    # Step 4: compute spendable — each remaining roster slot costs at least $1
     min_reserve = dc.my_remaining_roster_spots - 1
     spendable   = max(1, dc.my_remaining_budget - min_reserve)
 
     # Step 5: draft progress adjustment
-    # draft_progress approaches 1.0 as the draft nears completion.
-    # budget_ratio > 0.5 means the user has more spendable budget than usual
-    # → encourage spending by pushing the bid up.
-    total_players    = lc.league_size * lc.roster_size
-    draft_progress   = dc.drafted_players_count / total_players if total_players > 0 else 0.0
+    draft_progress   = dc.drafted_players_count / (lc.league_size * lc.roster_size)
     budget_ratio     = spendable / dc.my_remaining_budget if dc.my_remaining_budget > 0 else 0.5
-
     draft_multiplier = 1.0 + (budget_ratio - 0.5) * 0.2 * draft_progress
-    draft_adj        = adjusted_price * draft_multiplier - adjusted_price  # net dollar change
+    draft_adj        = adjusted_price * draft_multiplier - adjusted_price
 
-    # Step 6: apply multiplier, round to integer, clip to [1, spendable]
+    # Step 6: clip to [1, spendable]
     raw_bid         = adjusted_price * draft_multiplier
-    recommended_bid = max(1, min(round(raw_bid), spendable))
+    recommended_bid = max(1, min(spendable, round(raw_bid)))
 
     return PlayerBidResponse(
         player_name=request.player_name,
-        player_type=request.player_type,
+        player_type=player_type,
         player_value=player_value,
         recommended_bid=recommended_bid,
         bid_breakdown=BidBreakdown(
-            base_price=round(base_price,    2),
-            scarcity_adjustment=round(scarcity_adj,  2),
-            draft_adjustment=round(draft_adj,     2),
+            base_price=round(base_price,   2),
+            scarcity_adjustment=round(scarcity_adj, 2),
+            draft_adjustment=round(draft_adj,    2),
             max_spendable=spendable,
         ),
     )
