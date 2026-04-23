@@ -82,11 +82,21 @@ class LeagueContext(BaseModel):
     total_budget: int
 
 
+class RosterEntry(BaseModel):
+    player_name: str
+    position:    str   # e.g. "C", "SS", "OF"
+
+
 class DraftContext(BaseModel):
     my_remaining_budget:       int
     my_remaining_roster_spots: int
     my_positions_filled:       list[str]
     drafted_players_count:     int
+
+    # Optional: full roster state for dynamic scarcity bonus (ALG-03)
+    # If omitted, _get_dynamic_scarcity_bonus() falls back to static POSITION_BONUS.
+    my_roster:         list[RosterEntry]        | None = None
+    opponent_rosters:  dict[str, list[RosterEntry]] | None = None
 
 
 # ── Request Models ────────────────────────────────────────────────────────────
