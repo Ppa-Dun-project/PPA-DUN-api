@@ -164,7 +164,7 @@ class PlayerBidResponse(BaseModel):
 # ── player_name Based Bid Models ──────────────────────────────────────────────
 
 class PlayerBidByNameRequest(BaseModel):
-    player_name:    str
+    player_id:      int            # MLB stable integer player ID (replaces player_name)
     league_context: LeagueContext
     draft_context:  DraftContext
 
