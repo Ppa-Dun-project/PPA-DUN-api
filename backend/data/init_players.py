@@ -53,8 +53,78 @@ TEAM_ABBR_MAP = {
     "WAS": "WSH",
 }
 
+# Baseball Reference numeric position codes mapped to standard abbreviations.
+# Keys are single characters extracted from the raw position string.
+_BR_NUM_TO_POS = {
+    "1": "P",
+    "2": "C",
+    "3": "1B",
+    "4": "2B",
+    "5": "3B",
+    "6": "SS",
+    "7": "OF",
+    "8": "OF",
+    "9": "OF",
+    "D": "DH",
+}
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _normalize_position_al(raw: str) -> str:
+    """
+    Convert a Baseball Reference AL position string to a standard abbreviation.
+
+    Baseball Reference encodes positions as numeric strings with modifiers:
+      - Leading '*' marks a primary position (e.g. '*9' = primary RF)
+      - '/' separates primary from secondary positions
+      - 'H' = pinch hitter (not a fielding position — skip to next char)
+      - 'D' = designated hitter
+
+    Strategy: strip '*', take the first meaningful character, map via _BR_NUM_TO_POS.
+    Falls back to 'UTIL' if the code is unrecognized.
+
+    Examples:
+      '9D/H'  -> '9' -> 'OF'
+      '*6/DH' -> '6' -> 'SS'
+      '*2H/D' -> '2' -> 'C'
+      'D9/H'  -> 'D' -> 'DH'
+      '3/DH'  -> '3' -> '1B'
+    """
+    cleaned = raw.strip().lstrip("*")
+    if not cleaned:
+        return "UTIL"
+
+    first = cleaned[0].upper()
+
+    # 'H' as first char = pinch hitter only; look at next char for fielding position
+    if first == "H":
+        if len(cleaned) > 1 and cleaned[1].upper() in _BR_NUM_TO_POS:
+            return _BR_NUM_TO_POS[cleaned[1].upper()]
+        return "UTIL"
+
+    return _BR_NUM_TO_POS.get(first, "UTIL")
+
+
+def _normalize_position_nl(raw: str) -> str:
+    """
+    Normalize an NL dump position string to a standard abbreviation.
+
+    NL dump positions are already standard abbreviations but may be
+    comma-separated multi-position strings (e.g. '2B,3B,SS').
+    Take the first listed position as the primary.
+
+    Examples:
+      'OF'       -> 'OF'
+      '2B,3B,SS' -> '2B'
+      'C,1B'     -> 'C'
+      'U,P'      -> 'UTIL'
+    """
+    first = raw.split(",")[0].strip()
+    if first in ("U", ""):
+        return "UTIL"
+    return first
+
 
 # def normalize_name(name: str) -> str:
 #     """
@@ -167,6 +237,7 @@ def parse_sql_dump(filepath: str, league: str) -> list[dict]:
         try:
             if league == "AL":
                 name, position, team = fields[0], fields[1], fields[2]
+                position = _normalize_position_al(position)
                 ab  = int(fields[3])    if fields[3]  else None
                 r   = int(fields[4])    if fields[4]  else None
                 h   = int(fields[5])    if fields[5]  else None
@@ -187,6 +258,7 @@ def parse_sql_dump(filepath: str, league: str) -> list[dict]:
 
             else:  # NL
                 name, position, team = fields[0], fields[1], fields[2]
+                position = _normalize_position_nl(position)
                 ab  = int(fields[3])    if fields[3]  else None
                 r   = int(fields[4])    if fields[4]  else None
                 h   = int(fields[5])    if fields[5]  else None
@@ -211,9 +283,8 @@ def parse_sql_dump(filepath: str, league: str) -> list[dict]:
 
         team = TEAM_ABBR_MAP.get(team, team)
 
-        # Skip pitchers (position code 1 = pitcher in Baseball Reference format)
-        p_clean = position.strip().lstrip("*").lstrip("/")
-        if p_clean.startswith("1") or position.strip() in ("1", "/1"):
+        # Skip pitchers — position has already been normalized to standard abbreviation
+        if position == "P":
             continue
 
         rows.append({

@@ -36,22 +36,31 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 # exposure of internal DB fields (e.g. player_id, first_name, team_id).
 
 ALLOWED_COLUMNS = {
-    "name", "position", "team",
+    "name", "position", "team", "player_id",
+    "primary_number", "birth_date", "birth_city", "birth_country",
+    "height", "weight", "current_age", "mlb_debut_date", "bat_side", "pitch_hand",
     "ab", "r", "h", "single", "double", "triple",
     "hr", "rbi", "bb", "k", "sb", "cs", "avg", "obp", "slg",
     "injury_status", "depth_order", "player_value",
 }
 
-# Returned when the columns param is omitted
-DEFAULT_COLUMNS = ["name", "position", "team", "player_value"]
-
-# All queryable columns returned by GET /players/{player_name}
-FULL_COLUMNS = [
-    "name", "position", "team",
+# Ordered list for full detail response (ALLOWED_COLUMNS as sorted list)
+FULL_DETAIL_COLUMNS = [
+    "name", "position", "team", "player_id",
+    "primary_number", "birth_date", "birth_city", "birth_country",
+    "height", "weight", "current_age", "mlb_debut_date", "bat_side", "pitch_hand",
     "ab", "r", "h", "single", "double", "triple",
     "hr", "rbi", "bb", "k", "sb", "cs", "avg", "obp", "slg",
     "injury_status", "depth_order", "player_value",
 ]
+
+# Returned when the columns param is omitted
+BASIC_COLUMNS = [
+    "name", "position", "team", "player_id",
+    "ab", "r", "h", "single", "double", "triple",
+    "hr", "rbi", "bb", "k", "sb", "cs", "avg", "obp", "slg",
+    "injury_status", "depth_order", "player_value",
+    ]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -118,7 +127,7 @@ def get_players(
         # Ensure name is always first, deduplicate while preserving order
         select_cols = list(dict.fromkeys(["name"] + requested))
     else:
-        select_cols = DEFAULT_COLUMNS
+        select_cols = BASIC_COLUMNS
 
     table      = "players_al" if league == "AL" else "players_nl"
     col_clause = ", ".join(f"`{c}`" for c in select_cols)
@@ -138,23 +147,33 @@ def get_players(
     }
 
 
-# ── GET /players/{player_name} ────────────────────────────────────────────────
+# ── GET /players/{player_id} ────────────────────────────────────────────────
 
-@router.get("/players/{player_name}")
-def get_player(player_name: str):
+@router.get("/players/{player_id}")
+def get_player(
+    player_id: int,
+    detail: str | None = Query(None, description="Pass 'full' to include all columns in ALLOWED_COLUMNS")
+    ):
     """
-    GET /players/{player_name}
+    GET /players/{player_id}
+    GET /players/{player_id}?detail=full
 
-    Returns the full record for a single player (all columns in FULL_COLUMNS).
+    Returns a single player's record identified by MLB player_id.
+    - detail omitted : returns BASIC_COLUMNS only (name, position, team, player_value)
+    - detail=full    : returns all columns in ALLOWED_COLUMNS
+    - Returns 400 if detail param is provided but not 'full'
+    - Returns 404 if player_id is not found in either table.
     - Searches players_al first, then players_nl as fallback.
-    - Name matching uses normalize_name() on both sides to handle
-      punctuation and diacritic differences (e.g. C.J. -> CJ, Acuna -> Acuna).
-    - Returns 404 if the player is not found in either table.
-    - Spaces in names must be URL-encoded: /players/Juan%20Soto
     - Requires a valid X-API-Key header (enforced by middleware in api/main.py).
     """
-    norm       = _normalize_name(player_name)
-    col_clause = ", ".join(f"`{c}`" for c in FULL_COLUMNS)
+    if detail is not None and detail.lower() != "full":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid detail value. Use 'full' or omit the parameter.",
+        )
+
+    select_cols = FULL_DETAIL_COLUMNS if detail and detail.lower() == "full" else BASIC_COLUMNS
+    col_clause  = ", ".join(f"`{c}`" for c in select_cols)
 
     db = SessionLocal()
     try:
@@ -163,16 +182,17 @@ def get_player(player_name: str):
                 text(f"""
                     SELECT {col_clause}
                     FROM {table}
-                    WHERE LOWER(REPLACE(REPLACE(name, '.', ''), '\\'', '')) = :norm
+                    WHERE player_id = :pid
                     LIMIT 1
                 """),
-                {"norm": norm},
+                {"pid": player_id},
             ).fetchone()
 
             if row:
                 return {
-                    "league": "AL" if table == "players_al" else "NL",
-                    "player": _row_to_dict(row, FULL_COLUMNS),
+                    "league":  "AL" if table == "players_al" else "NL",
+                    "detail":  detail.lower() if detail else "basic",
+                    "player":  _row_to_dict(row, select_cols),
                 }
     except Exception:
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -181,7 +201,7 @@ def get_player(player_name: str):
 
     raise HTTPException(
         status_code=404,
-        detail=f"Player '{player_name}' not found",
+        detail=f"Player with player_id={player_id} not found",
     )
 
 
@@ -198,7 +218,7 @@ BATTER_STAT_COLS  = ["ab", "r", "hr", "rbi", "sb", "cs", "avg"]
 
 # All columns needed for the bid/name endpoint
 BID_NAME_COLUMNS  = [
-    "name", "position", "team",
+    "name", "position", "team", "player_id",
     "ab", "r", "hr", "rbi", "sb", "cs", "avg",
     "injury_status", "depth_order", "player_value",
 ]
@@ -209,16 +229,15 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     """
     POST /player/bid/name
 
-    Accepts player_name, league_context, and draft_context.
+    Accepts player_id, league_context, and draft_context.
     Fetches player stats from DB (players_al then players_nl),
     uses stored player_value, and returns recommended_bid.
 
-    - Returns 404 if player is not found in either table.
+    - Returns 404 if player_id is not found in either table.
     - player_value is read from DB (not recalculated).
     - recommended_bid is computed via compute_recommended_bid().
     - Requires a valid X-API-Key header.
     """
-    norm       = _normalize_name(request.player_name)
     col_clause = ", ".join(f"`{c}`" for c in BID_NAME_COLUMNS)
 
     # Look up player in players_al then players_nl
@@ -231,10 +250,10 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
                 text(f"""
                     SELECT {col_clause}
                     FROM {table}
-                    WHERE LOWER(REPLACE(REPLACE(name, '.', ''), '\\'', '')) = :norm
+                    WHERE player_id = :pid
                     LIMIT 1
                 """),
-                {"norm": norm},
+                {"pid": request.player_id},
             ).fetchone()
             if row:
                 league = lg
@@ -247,7 +266,7 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     if row is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Player '{request.player_name}' not found",
+            detail=f"Player with player_id={request.player_id} not found",
         )
 
     # Determine player_type from position
@@ -291,7 +310,7 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     # Override player_value in the pipeline by injecting stored value directly
     # via a minimal PlayerBidRequest with the fetched stats
     bid_request = PlayerBidRequest(
-        player_name=request.player_name,
+        player_name=row.name,
         position=position,
         stats=batter_stats,
         league_context=request.league_context,
