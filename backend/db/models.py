@@ -47,10 +47,10 @@ class APIKey(Base):
     user = relationship("User", back_populates="api_keys")
 
 # ── PlayerBase ────────────────────────────────────────────────────────────────
-# Abstract mixin that defines the shared schema for ALPlayer and NLPlayer.
+# Abstract mixin that defines the shared schema for ALBatter and NLBatter.
 #
 # __abstract__ = True tells SQLAlchemy not to create a table for this class
-# itself. Only its concrete subclasses (ALPlayer, NLPlayer) get tables.
+# itself. Only its concrete subclasses (ALBatter, NLBatter) get tables.
 # declared_attr is required for columns that reference relationships or need
 # per-class customization; regular Column() definitions are inherited as-is.
 #
@@ -134,20 +134,20 @@ class PlayerBase:
     updated_at = Column(DateTime, nullable=True)
  
  
-# ── ALPlayer ──────────────────────────────────────────────────────────────────
+# ── ALBatter ──────────────────────────────────────────────────────────────────
 # American League batters. Populated from players_stats_al_2025.sql.
 # Queried when API requests specify league="AL".
+
+class ALBatter(PlayerBase, Base):
+    __tablename__ = "batters_al"
  
-class ALPlayer(PlayerBase, Base):
-    __tablename__ = "players_al"
  
- 
-# ── NLPlayer ──────────────────────────────────────────────────────────────────
+# ── NLBatter ──────────────────────────────────────────────────────────────────
 # National League batters. Populated from players_stats_nl_2025.sql.
 # Queried when API requests specify league="NL".
  
-class NLPlayer(PlayerBase, Base):
-    __tablename__ = "players_nl"
+class NLBatter(PlayerBase, Base):
+    __tablename__ = "batters_nl"
 
 
 # ── Unmatched ──────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ class UnmatchedPlayer(Base):
 # player_type : "batter" or "pitcher"
 # category    : stat name — batter: R, HR, RBI, SB, AVG
 #                           pitcher: W, SV, K, ERA, WHIP
-# mean / std  : computed from non-NULL rows in players_al + players_nl
+# mean / std  : computed from non-NULL rows in batters_al + batters_nl
 # computed_at : UTC timestamp of the last successful computation
 
 class LeagueBaseline(Base):

@@ -32,7 +32,7 @@ HEADERS = {
 BASE_URL = "https://www.espn.com/mlb/team/depth/_/name/{slug}"
 
 # (ESPN slug, league)
-# League determines which table (players_al or players_nl) to update first
+# League determines which table (batters_al or batters_nl) to update first
 TEAMS = [
     # AL
     ("bal",  "AL"), ("bos",  "AL"), ("nyy",  "AL"), ("tb",   "AL"), ("tor",  "AL"),
@@ -84,7 +84,7 @@ def _scrape_team(slug: str) -> list[dict]:
             break
         position = positions[row_idx]
 
-        # Skip pitchers — players tables contain batters only
+        # Skip pitchers — batter tables contain batters only
         if position in PITCHER_POSITIONS:
             continue
 
@@ -110,17 +110,17 @@ def _scrape_team(slug: str) -> list[dict]:
 
 def _update_players(rows: list[dict], league: str) -> tuple[int, int]:
     """
-    Update depth_order in the appropriate players table.
+    Update depth_order in the appropriate batters table.
 
     Strategy:
-      - Primary table  : players_al if league == "AL", else players_nl
+      - Primary table  : batters_al if league == "AL", else batters_nl
       - Fallback table : the other one (handles traded players)
     Match is done by normalize_name() applied to both sides at query time.
 
     Returns (matched_count, unmatched_count).
     """
-    primary  = "players_al" if league == "AL" else "players_nl"
-    fallback = "players_nl" if league == "AL" else "players_al"
+    primary  = "batters_al" if league == "AL" else "batters_nl"
+    fallback = "batters_nl" if league == "AL" else "batters_al"
 
     db      = SessionLocal()
     matched = 0
@@ -163,15 +163,15 @@ def _update_players(rows: list[dict], league: str) -> tuple[int, int]:
 
 def _reset_depth_order() -> None:
     """
-    Clear depth_order for both players tables before applying today's data.
+    Clear depth_order for both batters tables before applying today's data.
     Runs once per pipeline run so stale entries from yesterday do not persist,
     while allowing the 30-team loop to accumulate today's values without
     overwriting each other.
     """
     db = SessionLocal()
     try:
-        db.execute(text("UPDATE players_al SET depth_order = NULL"))
-        db.execute(text("UPDATE players_nl SET depth_order = NULL"))
+        db.execute(text("UPDATE batters_al SET depth_order = NULL"))
+        db.execute(text("UPDATE batters_nl SET depth_order = NULL"))
         db.commit()
     except Exception:
         db.rollback()
@@ -182,7 +182,7 @@ def _reset_depth_order() -> None:
 
 def fetch_and_update() -> None:
     """
-    Scrape ESPN depth charts for all 30 teams and update players tables.
+    Scrape ESPN depth charts for all 30 teams and update batters tables.
     Called by daily_update.py.
     """
     _reset_depth_order()

@@ -54,7 +54,7 @@ def _compute_mean_std(values: list[float]) -> tuple[float, float] | None:
 
 def compute_and_store(db: Session) -> dict:
     """
-    Compute batter league baselines from players_al and players_nl,
+    Compute batter league baselines from batters_al and batters_nl,
     upsert results into the league_baselines table, and return the
     computed values as a dict to be POSTed to the api server.
 
@@ -73,8 +73,8 @@ def compute_and_store(db: Session) -> dict:
     for col, stat_key in BATTER_COLUMN_TO_STAT.items():
         # Collect non-NULL values from both AL and NL tables
         values = (
-            _fetch_column(db, "players_al", col)
-            + _fetch_column(db, "players_nl", col)
+            _fetch_column(db, "batters_al", col)
+            + _fetch_column(db, "batters_nl", col)
         )
 
         computed = _compute_mean_std(values)

@@ -1,6 +1,6 @@
 # backend/data/init_players.py
 #
-# One-time initialization script. Populates players_al and players_nl tables by:
+# One-time initialization script. Populates batters_al and batters_nl tables by:
 #   1. Fetching all 2025 MLB players from the MLB Stats API (statsapi.mlb.com)
 #   2. Parsing AL and NL season stats from local SQL dump files
 #   3. Matching each SQL dump row to an API player using (normalized_name, team)
@@ -21,7 +21,7 @@ load_dotenv()
 
 from sqlalchemy.orm import Session
 from db.session import SessionLocal, engine, Base
-from db.models import ALPlayer, NLPlayer, UnmatchedPlayer
+from db.models import ALBatter, NLBatter, UnmatchedPlayer
 from data.utils import normalize_name
 
 logging.basicConfig(
@@ -306,7 +306,7 @@ def parse_sql_dump(filepath: str, league: str) -> list[dict]:
 
 def _build_player_kwargs(row: dict, api_player: dict) -> dict:
     """
-    Build the keyword arguments dict shared by both ALPlayer and NLPlayer
+    Build the keyword arguments dict shared by both ALBatter and NLBatter
     constructors. Centralizes the field mapping so it is not duplicated.
     """
     return dict(
@@ -367,7 +367,7 @@ def insert_league(
 ) -> None:
     """
     Match SQL dump rows for one league to MLB API players and insert them
-    into the given ORM model class (ALPlayer or NLPlayer).
+    into the given ORM model class (ALBatter or NLBatter).
 
     Matching key: (normalize_name(name), team_abbr)
     Unmatched rows are logged to init_players_unmatched.log.
@@ -434,8 +434,8 @@ def run():
 
     db = SessionLocal()
     try:
-        insert_league(db, al_rows, api_lookup, ALPlayer, "AL")
-        insert_league(db, nl_rows, api_lookup, NLPlayer, "NL")
+        insert_league(db, al_rows, api_lookup, ALBatter, "AL")
+        insert_league(db, nl_rows, api_lookup, NLBatter, "NL")
     finally:
         db.close()
 
