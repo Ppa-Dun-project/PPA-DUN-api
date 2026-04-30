@@ -46,7 +46,7 @@ class APIKey(Base):
     # Accessing api_key.user returns the User object that owns this key.
     user = relationship("User", back_populates="api_keys")
 
-# ── PlayerBase ────────────────────────────────────────────────────────────────
+# ── BatterBase ────────────────────────────────────────────────────────────────
 # Abstract mixin that defines the shared schema for ALBatter and NLBatter.
 #
 # __abstract__ = True tells SQLAlchemy not to create a table for this class
@@ -74,7 +74,7 @@ class APIKey(Base):
 #                                     manual so stats writes do not affect
 #                                     this timestamp.
  
-class PlayerBase:
+class BatterBase:
     __abstract__ = True
  
     # ── Identity: from SQL dumps ──────────────────────────────────────────────
@@ -138,7 +138,7 @@ class PlayerBase:
 # American League batters. Populated from players_stats_al_2025.sql.
 # Queried when API requests specify league="AL".
 
-class ALBatter(PlayerBase, Base):
+class ALBatter(BatterBase, Base):
     __tablename__ = "batters_al"
  
  
@@ -146,8 +146,104 @@ class ALBatter(PlayerBase, Base):
 # National League batters. Populated from players_stats_nl_2025.sql.
 # Queried when API requests specify league="NL".
  
-class NLBatter(PlayerBase, Base):
+class NLBatter(BatterBase, Base):
     __tablename__ = "batters_nl"
+
+
+# ── PitcherBase ───────────────────────────────────────────────────────────────
+# Abstract mixin that defines the shared schema for ALPitcher and NLPitcher.
+#
+# Column groups:
+#   Identity (from SQL dumps)       : name, position, team
+#   Identity (from statsapi.mlb.com): player_id (PK) and biographical fields.
+#                                     Populated once at init. Never modified.
+#   Stats — FVARz (from SQL dumps)  : w, sv, so, era, whip, ip.
+#                                     Used directly in pitcher valuation.
+#   Stats — reference only          : l, g, gs, war, fip, h, r, er, hr, bb,
+#                                     hbp, bf, era_plus, h9, hr9, bb9, so9,
+#                                     so_bb. Stored for API access only.
+#   Status (daily scheduler)        : injury_status, depth_order, player_value.
+#   Timestamp                       : updated_at. Manual only.
+
+class PitcherBase:
+    __abstract__ = True
+
+    # ── Identity: from SQL dumps ──────────────────────────────────────────────
+    # position defaults to "P" at init; overwritten by ESPN depth chart updates
+    # with "SP", "RP", or "CL" as the season progresses.
+    name     = Column(String(255), nullable=False, index=True)
+    position = Column(String(20),  nullable=False)
+    team     = Column(String(10),  nullable=False)
+
+    # ── Identity: from statsapi.mlb.com (init only) ───────────────────────────
+    player_id      = Column(Integer, primary_key=True, index=True)
+    first_name     = Column(String(100), nullable=True)
+    last_name      = Column(String(100), nullable=True)
+    primary_number = Column(String(10),  nullable=True)
+    birth_date     = Column(String(20),  nullable=True)
+    birth_city     = Column(String(100), nullable=True)
+    birth_country  = Column(String(100), nullable=True)
+    height         = Column(String(10),  nullable=True)
+    weight         = Column(Integer,     nullable=True)
+    current_age    = Column(Integer,     nullable=True)
+    position_name  = Column(String(50),  nullable=True)
+    team_id        = Column(Integer,     nullable=True)
+    bat_side       = Column(String(5),   nullable=True)
+    pitch_hand     = Column(String(5),   nullable=True)
+    mlb_debut_date = Column(String(20),  nullable=True)
+    active         = Column(Integer,     nullable=True)   # 1 = active, 0 = inactive
+
+    # ── Season stats — FVARz inputs (from SQL dumps) ──────────────────────────
+    w    = Column(Integer, nullable=True)   # wins
+    sv   = Column(Integer, nullable=True)   # saves
+    so   = Column(Integer, nullable=True)   # strikeouts (SO in Baseball Reference)
+    era  = Column(Float,   nullable=True)   # earned run average
+    whip = Column(Float,   nullable=True)   # walks + hits per inning pitched
+    ip   = Column(Float,   nullable=True)   # innings pitched
+
+    # ── Season stats — reference only (from SQL dumps) ────────────────────────
+    l       = Column(Integer, nullable=True)   # losses
+    g       = Column(Integer, nullable=True)   # games pitched
+    gs      = Column(Integer, nullable=True)   # games started
+    war     = Column(Float,   nullable=True)   # wins above replacement
+    fip     = Column(Float,   nullable=True)   # fielding independent pitching
+    h       = Column(Integer, nullable=True)   # hits allowed
+    r       = Column(Integer, nullable=True)   # runs allowed
+    er      = Column(Integer, nullable=True)   # earned runs
+    hr      = Column(Integer, nullable=True)   # home runs allowed
+    bb      = Column(Float,   nullable=True)   # walks (stored as Float; source has .0 values)
+    hbp     = Column(Integer, nullable=True)   # hit by pitch
+    bf      = Column(Integer, nullable=True)   # batters faced
+    era_plus = Column(Float,  nullable=True)   # ERA+ (park/league adjusted; NULL when undefined)
+    h9      = Column(Float,   nullable=True)   # hits per 9 innings
+    hr9     = Column(Float,   nullable=True)   # home runs per 9 innings
+    bb9     = Column(Float,   nullable=True)   # walks per 9 innings
+    so9     = Column(Float,   nullable=True)   # strikeouts per 9 innings
+    so_bb   = Column(Float,   nullable=True)   # SO/BB ratio (NULL when BB = 0)
+
+    # ── Daily-updated status ──────────────────────────────────────────────────
+    injury_status = Column(String(50), nullable=True)
+    depth_order   = Column(Integer,    nullable=True)
+    player_value  = Column(Float,      nullable=True)
+
+    # ── Timestamp (manual only) ───────────────────────────────────────────────
+    updated_at = Column(DateTime, nullable=True)
+
+
+# ── ALPitcher ─────────────────────────────────────────────────────────────────
+# American League pitchers. Populated from pitchers_stats_al_2025.sql.
+# Queried when API requests specify league="AL".
+
+class ALPitcher(PitcherBase, Base):
+    __tablename__ = "pitchers_al"
+
+
+# ── NLPitcher ─────────────────────────────────────────────────────────────────
+# National League pitchers. Populated from pitchers_stats_nl_2025.sql.
+# Queried when API requests specify league="NL".
+
+class NLPitcher(PitcherBase, Base):
+    __tablename__ = "pitchers_nl"
 
 
 # ── Unmatched ──────────────────────────────────────────────────────────────────
@@ -182,6 +278,7 @@ class UnmatchedPlayer(Base):
 # category    : stat name — batter: R, HR, RBI, SB, AVG
 #                           pitcher: W, SV, K, ERA, WHIP
 # mean / std  : computed from non-NULL rows in batters_al + batters_nl
+#               or pitchers_al + pitchers_nl depending on player_type
 # computed_at : UTC timestamp of the last successful computation
 
 class LeagueBaseline(Base):
