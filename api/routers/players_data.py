@@ -35,7 +35,7 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 # This prevents SQL injection through column name manipulation and limits
 # exposure of internal DB fields (e.g. player_id, first_name, team_id).
 
-ALLOWED_COLUMNS = {
+BATTER_ALLOWED_COLUMNS = {
     "name", "position", "team", "player_id",
     "primary_number", "birth_date", "birth_city", "birth_country",
     "height", "weight", "current_age", "mlb_debut_date", "bat_side", "pitch_hand",
@@ -45,7 +45,7 @@ ALLOWED_COLUMNS = {
 }
 
 # Ordered list for full detail response (ALLOWED_COLUMNS as sorted list)
-FULL_DETAIL_COLUMNS = [
+BATTER_FULL_DETAIL_COLUMNS = [
     "name", "position", "team", "player_id",
     "primary_number", "birth_date", "birth_city", "birth_country",
     "height", "weight", "current_age", "mlb_debut_date", "bat_side", "pitch_hand",
@@ -55,7 +55,7 @@ FULL_DETAIL_COLUMNS = [
 ]
 
 # Returned when the columns param is omitted
-BASIC_COLUMNS = [
+BATTER_BASIC_COLUMNS = [
     "name", "position", "team", "player_id",
     "ab", "r", "h", "single", "double", "triple",
     "hr", "rbi", "bb", "k", "sb", "cs", "avg", "obp", "slg",
@@ -99,7 +99,7 @@ def get_players(
 
     Returns all players in the specified league.
     - league is required. Returns 400 if missing or not AL/NL.
-    - columns is optional. Returns 400 if any column is not in ALLOWED_COLUMNS.
+    - columns is optional. Returns 400 if any column is not in BATTER_ALLOWED_COLUMNS.
     - If columns is omitted, returns name, position, team, player_value only.
     - name is always included in the response regardless of columns param.
     - Requires a valid X-API-Key header (enforced by middleware in api/main.py).
@@ -115,21 +115,21 @@ def get_players(
     # Resolve and validate requested columns
     if columns:
         requested = [c.strip().lower() for c in columns.split(",") if c.strip()]
-        invalid   = [c for c in requested if c not in ALLOWED_COLUMNS]
+        invalid = [c for c in requested if c not in BATTER_ALLOWED_COLUMNS]
         if invalid:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     f"Invalid column(s): {', '.join(invalid)}. "
-                    f"Allowed columns: {', '.join(sorted(ALLOWED_COLUMNS))}"
+                    f"Allowed columns: {', '.join(sorted(BATTER_ALLOWED_COLUMNS))}"
                 ),
             )
         # Ensure name is always first, deduplicate while preserving order
         select_cols = list(dict.fromkeys(["name"] + requested))
     else:
-        select_cols = BASIC_COLUMNS
+        select_cols = BATTER_BASIC_COLUMNS
 
-    table      = "players_al" if league == "AL" else "players_nl"
+    table = "batters_al" if league == "AL" else "batters_nl"
     col_clause = ", ".join(f"`{c}`" for c in select_cols)
 
     db = SessionLocal()
@@ -163,7 +163,7 @@ def get_player(
     - detail=full    : returns all columns in ALLOWED_COLUMNS
     - Returns 400 if detail param is provided but not 'full'
     - Returns 404 if player_id is not found in either table.
-    - Searches players_al first, then players_nl as fallback.
+    - Searches batters_al first, then batters_nl as fallback.
     - Requires a valid X-API-Key header (enforced by middleware in api/main.py).
     """
     if detail is not None and detail.lower() != "full":
@@ -172,12 +172,12 @@ def get_player(
             detail="Invalid detail value. Use 'full' or omit the parameter.",
         )
 
-    select_cols = FULL_DETAIL_COLUMNS if detail and detail.lower() == "full" else BASIC_COLUMNS
+    select_cols = BATTER_FULL_DETAIL_COLUMNS if detail and detail.lower() == "full" else BATTER_BASIC_COLUMNS
     col_clause  = ", ".join(f"`{c}`" for c in select_cols)
 
     db = SessionLocal()
     try:
-        for table in ("players_al", "players_nl"):
+        for table in ("batters_al", "batters_nl"):
             row = db.execute(
                 text(f"""
                     SELECT {col_clause}
@@ -190,7 +190,7 @@ def get_player(
 
             if row:
                 return {
-                    "league":  "AL" if table == "players_al" else "NL",
+                    "league":  "AL" if table == "batters_al" else "NL",
                     "detail":  detail.lower() if detail else "basic",
                     "player":  _row_to_dict(row, select_cols),
                 }
@@ -230,7 +230,7 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     POST /player/bid/name
 
     Accepts player_id, league_context, and draft_context.
-    Fetches player stats from DB (players_al then players_nl),
+    Fetches player stats from DB (batters_al then batters_nl),
     uses stored player_value, and returns recommended_bid.
 
     - Returns 404 if player_id is not found in either table.
@@ -245,7 +245,7 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     row = None
     league = None
     try:
-        for table, lg in (("players_al", "AL"), ("players_nl", "NL")):
+        for table, lg in (("batters_al", "AL"), ("batters_nl", "NL")):
             row = db.execute(
                 text(f"""
                     SELECT {col_clause}

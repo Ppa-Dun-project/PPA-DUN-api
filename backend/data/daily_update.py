@@ -66,7 +66,6 @@ def _step_depth_charts() -> None:
 def _fetch_all_players(db, table: str) -> list[dict]:
     """
     Fetch all batter rows needed for FVARz recalculation.
-    Pitcher stats columns not yet in DB (pending ALG-02b) — pitchers skipped.
     """
     rows = db.execute(
         text(f"""
@@ -189,13 +188,12 @@ def _step_recalculate() -> None:
     """
     Fetch all players from both tables, compute player_value using FVARz,
     and write the result back to the DB.
-    Pitchers are skipped until pitcher stat columns are added (ALG-02b).
     """
     db = SessionLocal()
     try:
         players = (
-            _fetch_all_players(db, "players_al")
-            + _fetch_all_players(db, "players_nl")
+            _fetch_all_players(db, "batters_al")
+            + _fetch_all_players(db, "batters_nl")
         )
     finally:
         db.close()
