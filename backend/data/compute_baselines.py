@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 # ── Batter category definitions ───────────────────────────────────────────────
 # Maps DB column name → canonical stat key used in api/services/player.py.
-# Pitcher categories excluded until ALG-02b adds pitcher stat columns to DB.
 
 BATTER_COLUMN_TO_STAT = {
     "r":   "R",
@@ -17,6 +16,18 @@ BATTER_COLUMN_TO_STAT = {
     "rbi": "RBI",
     "sb":  "SB",
     "avg": "AVG",
+}
+
+# ── Pitcher category definitions ──────────────────────────────────────────────
+# ERA and WHIP are inverse stats (lower is better); z-score sign reversal is
+# handled in api/services/player.py, not here.
+
+PITCHER_COLUMN_TO_STAT = {
+    "w":    "W",
+    "sv":   "SV",
+    "so":   "K",
+    "era":  "ERA",
+    "whip": "WHIP",
 }
 
 # Internal api endpoint on the Docker Compose network.
@@ -54,21 +65,20 @@ def _compute_mean_std(values: list[float]) -> tuple[float, float] | None:
 
 def compute_and_store(db: Session) -> dict:
     """
-    Compute batter league baselines from batters_al and batters_nl,
+    Compute batter and pitcher league baselines from the respective tables,
     upsert results into the league_baselines table, and return the
     computed values as a dict to be POSTed to the api server.
-
-    Pitcher baselines are deferred until ALG-02b adds pitcher stat columns.
 
     Return format:
         {
             "batter":  {"R": {"mean": ..., "std": ...}, ...},
-            "pitcher": {},
+            "pitcher": {"W": {"mean": ..., "std": ...}, ...},
         }
     Returns {"batter": {}, "pitcher": {}} on complete failure.
     """
     computed_at = datetime.now(timezone.utc)
     batter_result = {}
+    pitcher_result = {}
 
     for col, stat_key in BATTER_COLUMN_TO_STAT.items():
         # Collect non-NULL values from both AL and NL tables
@@ -111,10 +121,51 @@ def compute_and_store(db: Session) -> dict:
             f"[baselines] batter.{stat_key}: "
             f"mean={mean:.4f}, std={std:.4f} (n={len(values)})"
         )
+    
+    # ── Pitcher baselines ─────────────────────────────────────────────────────
+    for col, stat_key in PITCHER_COLUMN_TO_STAT.items():
+        values = (
+            _fetch_column(db, "pitchers_al", col)
+            + _fetch_column(db, "pitchers_nl", col)
+        )
+
+        computed = _compute_mean_std(values)
+        if computed is None:
+            logger.warning(
+                f"[baselines] skipping pitcher.{stat_key} — "
+                f"insufficient or zero-variance data ({len(values)} rows)"
+            )
+            continue
+
+        mean, std = computed
+
+        db.execute(
+            text("""
+                INSERT INTO league_baselines (player_type, category, mean, std, computed_at)
+                VALUES (:pt, :cat, :mean, :std, :ts)
+                ON DUPLICATE KEY UPDATE
+                    mean        = VALUES(mean),
+                    std         = VALUES(std),
+                    computed_at = VALUES(computed_at)
+            """),
+            {
+                "pt":   "pitcher",
+                "cat":  stat_key,
+                "mean": mean,
+                "std":  std,
+                "ts":   computed_at,
+            },
+        )
+
+        pitcher_result[stat_key] = {"mean": mean, "std": std}
+        logger.info(
+            f"[baselines] pitcher.{stat_key}: "
+            f"mean={mean:.4f}, std={std:.4f} (n={len(values)})"
+        )
 
     db.commit()
     logger.info("[baselines] upsert complete")
-    return {"batter": batter_result, "pitcher": {}}
+    return {"batter": batter_result, "pitcher": pitcher_result}
 
 
 def push_to_api(baselines: dict) -> None:

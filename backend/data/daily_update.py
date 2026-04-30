@@ -63,7 +63,7 @@ def _step_depth_charts() -> None:
 
 # ── Step 3: Recalculate player_value ─────────────────────────────────────────
 
-def _fetch_all_players(db, table: str) -> list[dict]:
+def _fetch_all_batters(db, table: str) -> list[dict]:
     """
     Fetch all batter rows needed for FVARz recalculation.
     """
@@ -80,6 +80,7 @@ def _fetch_all_players(db, table: str) -> list[dict]:
         {
             "player_id":     row.player_id,
             "position":      row.position,
+            "player_type":   "batter",
             "ab":            row.ab,
             "r":             row.r,
             "hr":            row.hr,
@@ -95,38 +96,86 @@ def _fetch_all_players(db, table: str) -> list[dict]:
         for row in rows
     ]
 
+def _fetch_all_pitchers(db, table: str) -> list[dict]:
+    """
+    Fetch all pitcher rows needed for FVARz recalculation.
+    """
+    rows = db.execute(
+        text(f"""
+            SELECT player_id, position,
+                   w, sv, so, era, whip, ip,
+                   current_age, injury_status, depth_order
+            FROM {table}
+        """)
+    ).fetchall()
 
-PITCHER_POSITIONS = {"SP", "RP", "CL"}
+    return [
+        {
+            "player_id":     row.player_id,
+            "position":      row.position,
+            "player_type":   "pitcher",
+            "w":             row.w,
+            "sv":            row.sv,
+            "so":            row.so,
+            "era":           row.era,
+            "whip":          row.whip,
+            "ip":            row.ip,
+            "current_age":   row.current_age,
+            "injury_status": row.injury_status,
+            "depth_order":   row.depth_order,
+            "table":         table,
+        }
+        for row in rows
+    ]
+
+
+
 
 def _call_player_value(player: dict) -> float | None:
     """
     POST to /player/value and return player_value float.
-    Skips pitchers until pitcher stat columns are added (ALG-02b).
-    Returns None on failure or skip.
+    Handles both batters and pitchers based on player_type field.
+    Returns None on failure.
     """
-    position = (player["position"] or "").upper()
-    if position in PITCHER_POSITIONS:
-        return None
+    position    = (player["position"] or "").upper()
+    player_type = player.get("player_type", "batter")
 
-    if player["ab"] is None or player["avg"] is None:
-        return None
+    if player_type == "pitcher":
+        if player["ip"] is None or player["era"] is None:
+            return None
+        stats_payload = {
+            "player_type":   "pitcher",
+            "IP":            player["ip"]   or 0.0,
+            "W":             player["w"]    or 0,
+            "SV":            player["sv"]   or 0,
+            "K":             player["so"]   or 0,
+            "ERA":           player["era"]  or 0.0,
+            "WHIP":          player["whip"] or 0.0,
+            "age":           player["current_age"],
+            "depth_order":   player["depth_order"],
+            "injury_status": player["injury_status"],
+        }
+    else:
+        if player["ab"] is None or player["avg"] is None:
+            return None
+        stats_payload = {
+            "player_type":   "batter",
+            "AB":            player["ab"]   or 0,
+            "R":             player["r"]    or 0,
+            "HR":            player["hr"]   or 0,
+            "RBI":           player["rbi"]  or 0,
+            "SB":            player["sb"]   or 0,
+            "CS":            player["cs"]   or 0,
+            "AVG":           player["avg"]  or 0.0,
+            "age":           player["current_age"],
+            "depth_order":   player["depth_order"],
+            "injury_status": player["injury_status"],
+        }
 
     payload = {
         "player_name": str(player["player_id"]),
         "position":    position,
-        "stats": {
-            "player_type":  "batter",
-            "AB":  player["ab"]   or 0,
-            "R":   player["r"]    or 0,
-            "HR":  player["hr"]   or 0,
-            "RBI": player["rbi"]  or 0,
-            "SB":  player["sb"]   or 0,
-            "CS":  player["cs"]   or 0,
-            "AVG": player["avg"]  or 0.0,
-            "age":          player["current_age"],
-            "depth_order":  player["depth_order"],
-            "injury_status": player["injury_status"],
-        },
+        "stats":       stats_payload,
     }
 
     try:
@@ -143,62 +192,23 @@ def _call_player_value(player: dict) -> float | None:
         return None
 
 
-def _compute_player_value_local(player: dict) -> float | None:
-    """
-    Compute player_value using FVARz algorithm directly (no HTTP call).
-    Skips pitchers until pitcher stat columns are added (ALG-02b).
-    Returns None on failure or if player is a pitcher.
-    """
-    from api.models.player import PlayerValueRequest, BatterStats
-
-    position = (player["position"] or "").upper()
-    if position in PITCHER_POSITIONS:
-        return None  # pitcher stat columns not yet in DB
-
-    # Skip players with no stat data
-    if player["ab"] is None or player["avg"] is None:
-        return None
-
-    try:
-        request = PlayerValueRequest(
-            player_name=str(player["player_id"]),
-            position=position,
-            stats=BatterStats(
-                AB=player["ab"]  or 0,
-                R=player["r"]    or 0,
-                HR=player["hr"]  or 0,
-                RBI=player["rbi"] or 0,
-                SB=player["sb"]  or 0,
-                CS=player["cs"]  or 0,
-                AVG=player["avg"] or 0.0,
-                age=player["current_age"],
-                depth_order=player["depth_order"],
-                injury_status=player["injury_status"],
-            ),
-        )
-        from api.services.player import compute_player_value
-        response = compute_player_value(request)
-        return response.player_value
-    except Exception as e:
-        logger.warning(f"[recalculate] player_id={player['player_id']} compute failed: {e}")
-        return None
-
-
 def _step_recalculate() -> None:
     """
-    Fetch all players from both tables, compute player_value using FVARz,
-    and write the result back to the DB.
+    Fetch all batter and pitcher rows from all four tables, compute
+    player_value using FVARz, and write the result back to the DB.
     """
     db = SessionLocal()
     try:
         players = (
-            _fetch_all_players(db, "batters_al")
-            + _fetch_all_players(db, "batters_nl")
+            _fetch_all_batters(db, "batters_al")
+            + _fetch_all_batters(db, "batters_nl")
+            + _fetch_all_pitchers(db, "pitchers_al")
+            + _fetch_all_pitchers(db, "pitchers_nl")
         )
     finally:
         db.close()
 
-    logger.info(f"[recalculate] total players to process: {len(players)}")
+    logger.info(f"[recalculate] total players/pitchers to process: {len(players)}")
 
     updated = 0
     skipped = 0

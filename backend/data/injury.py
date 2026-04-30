@@ -142,13 +142,15 @@ def _fetch_from_html() -> list[dict]:
 
 def _reset_injury_status() -> None:
     """
-    Clear injury_status for all batters before applying today's data.
+    Clear injury_status for all batters and pitchers before applying today's data.
     Players not on today's injury report are considered healthy (NULL).
     """
     db = SessionLocal()
     try:
-        db.execute(text("UPDATE batters_al SET injury_status = NULL"))
-        db.execute(text("UPDATE batters_nl SET injury_status = NULL"))
+        db.execute(text("UPDATE batters_al  SET injury_status = NULL"))
+        db.execute(text("UPDATE batters_nl  SET injury_status = NULL"))
+        db.execute(text("UPDATE pitchers_al SET injury_status = NULL"))
+        db.execute(text("UPDATE pitchers_nl SET injury_status = NULL"))
         db.commit()
     except Exception:
         db.rollback()
@@ -159,9 +161,9 @@ def _reset_injury_status() -> None:
 
 def _update_players(rows: list[dict]) -> tuple[int, int]:
     """
-    Update injury_status in batters_al and batters_nl.
+    Update injury_status in batters_al, batters_nl, pitchers_al, pitchers_nl.
     Matches by normalize_name() applied to both sides at query time.
-    Tries batters_al first, then batters_nl as fallback (handles traded players).
+    Tries batter tables first, then pitcher tables as fallback.
     Returns (matched_count, unmatched_count).
     """
     db      = SessionLocal()
@@ -173,7 +175,7 @@ def _update_players(rows: list[dict]) -> tuple[int, int]:
             status = row["injury_status"]
 
             updated = False
-            for table in ("batters_al", "batters_nl"):
+            for table in ("batters_al", "batters_nl", "pitchers_al", "pitchers_nl"):
                 result = db.execute(
                     text(f"""
                         UPDATE {table}
@@ -205,7 +207,7 @@ def _update_players(rows: list[dict]) -> tuple[int, int]:
 
 def fetch_and_update() -> None:
     """
-    Fetch injury data (API-first, HTML fallback) and update players tables.
+    Fetch injury data (API-first, HTML fallback) and update batter and pitcher tables.
     Called by daily_update.py as Step 1 of the daily pipeline.
     """
     # 1st attempt: JSON API
