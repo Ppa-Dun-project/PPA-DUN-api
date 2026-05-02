@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from db.session import engine, Base
-from db.models import User, APIKey, ALPlayer, NLPlayer, UnmatchedPlayer  # noqa: F401
+from db.models import User, APIKey, ALBatter, NLBatter, ALPitcher, NLPitcher, UnmatchedPlayer  # noqa: F401
 from routers import auth, admin
 
 load_dotenv()
