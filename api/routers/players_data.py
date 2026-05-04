@@ -5,6 +5,7 @@ from api.models.player import (
     PlayerValueRequest,
     BatterStats,
     BatterStatsSnapshot,
+    PitcherStats,
     PitcherStatsSnapshot,
     LeagueContext,
     DraftContext,
@@ -63,6 +64,38 @@ BATTER_BASIC_COLUMNS = [
     ]
 
 
+PITCHER_ALLOWED_COLUMNS = {
+    "name", "position", "team", "player_id",
+    "primary_number", "birth_date", "birth_city", "birth_country",
+    "height", "weight", "current_age", "mlb_debut_date", "pitch_hand",
+    "w", "l", "sv", "so", "era", "whip", "ip",
+    "g", "gs", "war", "fip",
+    "h", "r", "er", "hr", "bb", "hbp", "bf",
+    "era_plus", "h9", "hr9", "bb9", "so9", "so_bb",
+    "injury_status", "depth_order", "player_value",
+}
+
+PITCHER_FULL_DETAIL_COLUMNS = [
+    "name", "position", "team", "player_id",
+    "primary_number", "birth_date", "birth_city", "birth_country",
+    "height", "weight", "current_age", "mlb_debut_date", "pitch_hand",
+    "w", "l", "sv", "so", "era", "whip", "ip",
+    "g", "gs", "war", "fip",
+    "h", "r", "er", "hr", "bb", "hbp", "bf",
+    "era_plus", "h9", "hr9", "bb9", "so9", "so_bb",
+    "injury_status", "depth_order", "player_value",
+]
+
+PITCHER_BASIC_COLUMNS = [
+    "name", "position", "team", "player_id",
+    "w", "l", "sv", "so", "era", "whip", "ip",
+    "g", "gs", "war", "fip",
+    "h", "r", "er", "hr", "bb", "hbp", "bf",
+    "era_plus", "h9", "hr9", "bb9", "so9", "so_bb",
+    "injury_status", "depth_order", "player_value",
+]
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _normalize_name(name: str) -> str:
@@ -86,21 +119,21 @@ def _row_to_dict(row, columns: list[str]) -> dict:
     return {col: getattr(row, col, None) for col in columns}
 
 
-# ── GET /players ──────────────────────────────────────────────────────────────
+# ── GET /players/batters ──────────────────────────────────────────────────────────────
 
-@router.get("/players")
-def get_players(
+@router.get("/players/batters")
+def get_batters(
     league:  str        = Query(...,  description="AL or NL (required)"),
     columns: str | None = Query(None, description="Comma-separated column names to include"),
 ):
     """
-    GET /players?league=AL
-    GET /players?league=AL&columns=hr,rbi,avg,player_value
+    GET /players/batters?league=AL
+    GET /players/batters?league=AL&columns=hr,rbi,avg,player_value
 
-    Returns all players in the specified league.
+    Returns all batters in the specified league.
     - league is required. Returns 400 if missing or not AL/NL.
     - columns is optional. Returns 400 if any column is not in BATTER_ALLOWED_COLUMNS.
-    - If columns is omitted, returns name, position, team, player_value only.
+    - If columns is omitted, returns BATTER_BASIC_COLUMNS.
     - name is always included in the response regardless of columns param.
     - Requires a valid X-API-Key header (enforced by middleware in api/main.py).
     """
@@ -143,24 +176,84 @@ def get_players(
     return {
         "league":  league,
         "count":   len(rows),
-        "players": [_row_to_dict(row, select_cols) for row in rows],
+        "batters": [_row_to_dict(row, select_cols) for row in rows],
+    }
+
+
+# ── GET /players/pitchers ─────────────────────────────────────────────────────
+
+@router.get("/players/pitchers")
+def get_pitchers(
+    league:  str        = Query(...,  description="AL or NL (required)"),
+    columns: str | None = Query(None, description="Comma-separated column names to include"),
+):
+    """
+    GET /players/pitchers?league=AL
+    GET /players/pitchers?league=AL&columns=w,sv,era,whip,player_value
+
+    Returns all pitchers in the specified league.
+    - league is required. Returns 400 if missing or not AL/NL.
+    - columns is optional. Returns 400 if any column is not in PITCHER_ALLOWED_COLUMNS.
+    - If columns is omitted, returns PITCHER_BASIC_COLUMNS.
+    - name is always included in the response regardless of columns param.
+    - Requires a valid X-API-Key header (enforced by middleware in api/main.py).
+    """
+    league = league.upper()
+    if league not in ("AL", "NL"):
+        raise HTTPException(
+            status_code=400,
+            detail="league must be AL or NL",
+        )
+
+    if columns:
+        requested = [c.strip().lower() for c in columns.split(",") if c.strip()]
+        invalid   = [c for c in requested if c not in PITCHER_ALLOWED_COLUMNS]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid column(s): {', '.join(invalid)}. "
+                    f"Allowed columns: {', '.join(sorted(PITCHER_ALLOWED_COLUMNS))}"
+                ),
+            )
+        select_cols = list(dict.fromkeys(["name"] + requested))
+    else:
+        select_cols = PITCHER_BASIC_COLUMNS
+
+    table      = "pitchers_al" if league == "AL" else "pitchers_nl"
+    col_clause = ", ".join(f"`{c}`" for c in select_cols)
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            text(f"SELECT {col_clause} FROM {table} ORDER BY player_value DESC")
+        ).fetchall()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    finally:
+        db.close()
+
+    return {
+        "league":   league,
+        "count":    len(rows),
+        "pitchers": [_row_to_dict(row, select_cols) for row in rows],
     }
 
 
 # ── GET /players/{player_id} ────────────────────────────────────────────────
 
-@router.get("/players/{player_id}")
+@router.get("/players/batters/{player_id}")
 def get_player(
     player_id: int,
     detail: str | None = Query(None, description="Pass 'full' to include all columns in ALLOWED_COLUMNS")
     ):
     """
-    GET /players/{player_id}
-    GET /players/{player_id}?detail=full
+    GET /players/batters/{player_id}
+    GET /players/batters/{player_id}?detail=full
 
-    Returns a single player's record identified by MLB player_id.
-    - detail omitted : returns BASIC_COLUMNS only (name, position, team, player_value)
-    - detail=full    : returns all columns in ALLOWED_COLUMNS
+    Returns a single batter's record identified by MLB player_id.
+    - detail omitted : returns BATTER_BASIC_COLUMNS only (name, position, team, player_value)
+    - detail=full    : returns all columns in BATTER_ALLOWED_COLUMNS
     - Returns 400 if detail param is provided but not 'full'
     - Returns 404 if player_id is not found in either table.
     - Searches batters_al first, then batters_nl as fallback.
@@ -192,7 +285,7 @@ def get_player(
                 return {
                     "league":  "AL" if table == "batters_al" else "NL",
                     "detail":  detail.lower() if detail else "basic",
-                    "player":  _row_to_dict(row, select_cols),
+                    "batter":  _row_to_dict(row, select_cols),
                 }
     except Exception:
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -201,7 +294,65 @@ def get_player(
 
     raise HTTPException(
         status_code=404,
-        detail=f"Player with player_id={player_id} not found",
+        detail=f"Batter with player_id={player_id} not found",
+    )
+
+
+# ── GET /players/pitchers/{player_id} ────────────────────────────────────────
+
+@router.get("/players/pitchers/{player_id}")
+def get_pitcher(
+    player_id: int,
+    detail: str | None = Query(None, description="Pass 'full' to include all columns"),
+):
+    """
+    GET /players/pitchers/{player_id}
+    GET /players/pitchers/{player_id}?detail=full
+
+    Returns a single pitcher's record identified by MLB player_id.
+    - detail omitted : returns PITCHER_BASIC_COLUMNS only
+    - detail=full    : returns all columns in PITCHER_FULL_DETAIL_COLUMNS
+    - Returns 400 if detail param is provided but not 'full'
+    - Returns 404 if player_id is not found in either table.
+    - Searches pitchers_al first, then pitchers_nl as fallback.
+    - Requires a valid X-API-Key header (enforced by middleware in api/main.py).
+    """
+    if detail is not None and detail.lower() != "full":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid detail value. Use 'full' or omit the parameter.",
+        )
+
+    select_cols = PITCHER_FULL_DETAIL_COLUMNS if detail and detail.lower() == "full" else PITCHER_BASIC_COLUMNS
+    col_clause  = ", ".join(f"`{c}`" for c in select_cols)
+
+    db = SessionLocal()
+    try:
+        for table in ("pitchers_al", "pitchers_nl"):
+            row = db.execute(
+                text(f"""
+                    SELECT {col_clause}
+                    FROM {table}
+                    WHERE player_id = :pid
+                    LIMIT 1
+                """),
+                {"pid": player_id},
+            ).fetchone()
+
+            if row:
+                return {
+                    "league":  "AL" if table == "pitchers_al" else "NL",
+                    "detail":  detail.lower() if detail else "basic",
+                    "pitcher": _row_to_dict(row, select_cols),
+                }
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    finally:
+        db.close()
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Pitcher with player_id={player_id} not found",
     )
 
 
@@ -211,15 +362,21 @@ def get_player(
 # and calculates recommended_bid via compute_recommended_bid().
 
 # Pitcher positions used to determine player_type from DB position field.
-PITCHER_POSITIONS = {"SP", "RP", "CL"}
+PITCHER_POSITIONS = {"P", "SP", "RP", "CL"}
 
 # Batter stat columns to fetch from DB
 BATTER_STAT_COLS  = ["ab", "r", "hr", "rbi", "sb", "cs", "avg"]
 
 # All columns needed for the bid/name endpoint
-BID_NAME_COLUMNS  = [
+BATTER_BID_NAME_COLUMNS = [
     "name", "position", "team", "player_id",
     "ab", "r", "hr", "rbi", "sb", "cs", "avg",
+    "injury_status", "depth_order", "player_value",
+]
+
+PITCHER_BID_NAME_COLUMNS = [
+    "name", "position", "team", "player_id",
+    "w", "sv", "so", "era", "whip", "ip",
     "injury_status", "depth_order", "player_value",
 ]
 
@@ -230,25 +387,27 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     POST /player/bid/name
 
     Accepts player_id, league_context, and draft_context.
-    Fetches player stats from DB (batters_al then batters_nl),
-    uses stored player_value, and returns recommended_bid.
+    Fetches player stats from DB — searches batters first, then pitchers.
+    Uses stored player_value and returns recommended_bid.
 
-    - Returns 404 if player_id is not found in either table.
+    - Returns 404 if player_id is not found in any table.
     - player_value is read from DB (not recalculated).
     - recommended_bid is computed via compute_recommended_bid().
     - Requires a valid X-API-Key header.
     """
-    col_clause = ", ".join(f"`{c}`" for c in BID_NAME_COLUMNS)
+    batter_col_clause  = ", ".join(f"`{c}`" for c in BATTER_BID_NAME_COLUMNS)
+    pitcher_col_clause = ", ".join(f"`{c}`" for c in PITCHER_BID_NAME_COLUMNS)
 
     # Look up player in players_al then players_nl
     db = SessionLocal()
     row = None
     league = None
+    player_type = None
     try:
         for table, lg in (("batters_al", "AL"), ("batters_nl", "NL")):
             row = db.execute(
                 text(f"""
-                    SELECT {col_clause}
+                    SELECT {batter_col_clause}
                     FROM {table}
                     WHERE player_id = :pid
                     LIMIT 1
@@ -256,8 +415,25 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
                 {"pid": request.player_id},
             ).fetchone()
             if row:
-                league = lg
+                league      = lg
+                player_type = "batter"
                 break
+
+        if row is None:
+            for table, lg in (("pitchers_al", "AL"), ("pitchers_nl", "NL")):
+                row = db.execute(
+                    text(f"""
+                        SELECT {pitcher_col_clause}
+                        FROM {table}
+                        WHERE player_id = :pid
+                        LIMIT 1
+                    """),
+                    {"pid": request.player_id},
+                ).fetchone()
+                if row:
+                    league      = lg
+                    player_type = "pitcher"
+                    break
     except Exception:
         raise HTTPException(status_code=503, detail="Database unavailable")
     finally:
@@ -270,9 +446,7 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
         )
 
     # Determine player_type from position
-    position    = row.position or ""
-    player_type = "pitcher" if position.upper() in PITCHER_POSITIONS else "batter"
-
+    position     = row.position or ""
     # Use stored player_value from DB
     stored_value = float(row.player_value) if row.player_value is not None else 0.0
 
@@ -296,14 +470,19 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
             depth_order=row.depth_order,
         )
     else:
-        # Pitcher stats not yet in DB (pending ALG-02b)
-        # Return empty snapshot; bid calculation uses player_value = 0
         stats_snapshot = PitcherStatsSnapshot(
-            ip=None, w=None, sv=None, k=None, era=None, whip=None,
+            ip=row.ip,   w=row.w,   sv=row.sv,
+            k=row.so,    era=row.era, whip=row.whip,
         )
-        raise HTTPException(
-            status_code=501,
-            detail="Pitcher bid by name not yet supported (pitcher stats pending ALG-02b)",
+        pitcher_stats = PitcherStats(
+            IP=row.ip     or 0.0,
+            W=row.w       or 0,
+            SV=row.sv     or 0,
+            K=row.so      or 0,
+            ERA=row.era   or 0.0,
+            WHIP=row.whip or 0.0,
+            injury_status=row.injury_status,
+            depth_order=row.depth_order,
         )
 
     # Compute recommended_bid using stored player_value
@@ -312,7 +491,7 @@ def player_bid_by_name(request: PlayerBidByNameRequest):
     bid_request = PlayerBidRequest(
         player_name=row.name,
         position=position,
-        stats=batter_stats,
+        stats=batter_stats if player_type == "batter" else pitcher_stats,
         league_context=request.league_context,
         draft_context=request.draft_context,
     )
