@@ -120,6 +120,9 @@ async def verify_api_key(request: Request, call_next):
         or request.url.path.startswith("/demo")
         or request.url.path.startswith("/internal")   # internal endpoints: no API key required
         or request.url.path == "/player/recalculate" # must be deleted after "FEAT-12" is done
+        or request.url.path == "/docs"               # FastAPI auto-generated Swagger UI
+        or request.url.path == "/redoc"              # FastAPI auto-generated ReDoc
+        or request.url.path == "/openapi.json"       # OpenAPI schema (consumed by /docs and /redoc)
         or request.method == "OPTIONS"
     ):
         return await call_next(request)
