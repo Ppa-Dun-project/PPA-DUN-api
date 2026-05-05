@@ -246,26 +246,6 @@ class NLPitcher(PitcherBase, Base):
     __tablename__ = "pitchers_nl"
 
 
-# ── Unmatched ──────────────────────────────────────────────────────────────────
-# players that are not in MLB stat api
-class UnmatchedPlayer(Base):
-    __tablename__ = "unmatched_players"
-
-    id         = Column(Integer, primary_key=True, index=True)
-    league     = Column(String(2),   nullable=False)          # "AL" or "NL"
-    name       = Column(String(255), nullable=False)          # raw name from SQL dump
-    team       = Column(String(10),  nullable=False)
-    position   = Column(String(20),  nullable=False)
-    ab         = Column(Integer,     nullable=True)
-    r          = Column(Integer,     nullable=True)
-    h          = Column(Integer,     nullable=True)
-    hr         = Column(Integer,     nullable=True)
-    rbi        = Column(Integer,     nullable=True)
-    sb         = Column(Integer,     nullable=True)
-    avg        = Column(Float,       nullable=True)
-    created_at = Column(DateTime,    default=datetime.utcnow)
-
-
 # ── LeagueBaseline ────────────────────────────────────────────────────────────
 # Stores per-category mean and std computed from the actual player pool.
 # Used by api/services/player.py as the baseline for z-score calculation.
