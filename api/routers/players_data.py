@@ -497,7 +497,7 @@ def player_bid_by_id(request: PlayerBidByIdRequest):
     )
     bid_response = compute_recommended_bid(bid_request, player_value=stored_value)
 
-    return PlayerBidByNameResponse(
+    return PlayerBidByIdResponse(
         player_name=row.name,
         player_type=player_type,
         position=position,
