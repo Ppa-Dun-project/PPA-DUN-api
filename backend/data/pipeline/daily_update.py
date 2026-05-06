@@ -38,7 +38,7 @@ INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 # ── Step 0: Compute league baselines ─────────────────────────────────────────
 
 def _step_baselines() -> None:
-    from data.compute_baselines import compute_and_store, push_to_api
+    from backend.data.pipeline.compute_baselines import compute_and_store, push_to_api
     db = SessionLocal()
     try:
         baselines = compute_and_store(db)
@@ -50,14 +50,14 @@ def _step_baselines() -> None:
 # ── Step 1: Injuries ──────────────────────────────────────────────────────────
 
 def _step_injuries() -> None:
-    from data.injury import fetch_and_update
+    from backend.data.sources.injury import fetch_and_update
     fetch_and_update()
 
 
 # ── Step 2: Depth Charts ──────────────────────────────────────────────────────
 
 def _step_depth_charts() -> None:
-    from data.depth_charts import fetch_and_update
+    from backend.data.sources.depth_charts import fetch_and_update
     fetch_and_update()
 
 

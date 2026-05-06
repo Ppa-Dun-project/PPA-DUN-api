@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     # Startup
     Base.metadata.create_all(bind=engine)
 
-    from data.daily_update import start_scheduler
+    from backend.data.pipeline.daily_update import start_scheduler
     scheduler = start_scheduler()
 
     yield

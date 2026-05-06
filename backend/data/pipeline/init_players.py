@@ -3,8 +3,8 @@
 # One-time initialization script. Populates batters_al, batters_nl,
 # pitchers_al, and pitchers_nl tables by:
 #   1. Fetching all 2025 MLB players from the MLB Stats API (statsapi.mlb.com)
-#   2. Parsing AL and NL season stats from local SQL dump files
-#   3. Matching each SQL dump row to an API player using (normalized_name, team)
+#   2. Parsing AL and NL season stats from local CSV files (raw_data/)
+#   3. Matching each CSV row to an API player using (normalized_name, team)
 #   4. Inserting matched rows into the appropriate league table
 #
 # Run once after the DB is initialized:
@@ -12,6 +12,7 @@
 #
 # Unmatched rows are logged to init_players_unmatched.log for review.
 
+import csv
 import os
 import re
 import logging
@@ -46,10 +47,11 @@ unmatched_logger.addHandler(unmatched_handler)
 SPORT_IDS = [1, 11, 12, 13, 14, 16]
 TEAMS_API_URL = "https://statsapi.mlb.com/api/v1/teams?sportId=1&season=2025"
 
-AL_BATTER_SQL_PATH  = os.path.join(os.path.dirname(__file__), "batters_stats_al_2025.sql")
-NL_BATTER_SQL_PATH  = os.path.join(os.path.dirname(__file__), "batters_stats_nl_2025.sql")
-AL_PITCHER_SQL_PATH = os.path.join(os.path.dirname(__file__), "pitchers_stats_al_2025.sql")
-NL_PITCHER_SQL_PATH = os.path.join(os.path.dirname(__file__), "pitchers_stats_nl_2025.sql")
+_DATA_DIR = os.path.dirname(os.path.dirname(__file__))
+AL_BATTER_CSV_PATH  = os.path.join(_DATA_DIR, "raw_data", "AL_batters.csv")
+NL_BATTER_CSV_PATH  = os.path.join(_DATA_DIR, "raw_data", "NL_batters.csv")
+AL_PITCHER_CSV_PATH = os.path.join(_DATA_DIR, "raw_data", "AL_pitchers.csv")
+NL_PITCHER_CSV_PATH = os.path.join(_DATA_DIR, "raw_data", "NL_pitchers.csv")
 
 # SQL dump team abbreviations that differ from MLB API abbreviations.
 TEAM_ABBR_MAP = {
@@ -358,113 +360,96 @@ def fetch_api_players() -> tuple[dict, dict, dict]:
     return lookup, team_id_to_abbr, team_id_to_league
 
 
-# ── Step 2: Parse SQL dump files ──────────────────────────────────────────────
+# ── Step 2: Parse CSV files ────────────────────────────────────────────────────
 
-def parse_batter_sql_dump(filepath: str, league: str, api_lookup: dict = None) -> list[dict]:
+def parse_batter_csv(filepath: str, league: str, api_lookup: dict = None) -> list[dict]:
     """
-    Parse an AL or NL SQL dump file (UTF-8) and return a list of row dicts.
+    Parse an AL or NL batter CSV file (UTF-8 with BOM) and return a list of row dicts.
 
-    Two-pass parsing for traded players:
-      - 1st pass: collect names that have a 2TM/3TM aggregate row
-      - 2nd pass: for those names, skip per-team rows and save 2TM/3TM row as team="TOT"
-                  for single-team players, process as before
+    Both AL and NL CSV files share the same column layout:
+      Rk, Player, Age, Team, WAR, G, PA, AB, R, H, 2B, 3B, HR, RBI,
+      SB, CS, BB, SO, BA, OBP, SLG, OPS, OPS+, rOBA, Rbat+, TB,
+      GIDP, HBP, SH, SF, IBB, Pos, Awards, Player-additional
+
+    1B (single) is not present in either file — derived as H - 2B - 3B - HR.
+
+    Two-pass logic for traded players:
+      - 1st pass: collect Player names that appear with Team 2TM or 3TM
+      - 2nd pass: for traded players, keep only the 2TM/3TM aggregate row (team="TOT");
+                  for single-team players, keep as-is
 
     TWP (Two-Way Players) are allowed through the position=="P" filter
     when their MLB API primaryPosition is confirmed as "TWP".
-
-    Column layouts:
-      AL: Name, Position, Team, AB, R, H, HR, 2B, 3B, RBI, BB, K, SB, CS,
-          AVG, OBP, SLG  (no 1B column; single derived as H - 2B - 3B - HR)
-      NL: Name, Position, Team, AB, R, H, 1B, 2B, 3B, HR, RBI, BB, K, SB, CS,
-          AVG, OBP, SLG  (1B column present)
     """
-    logger.info(f"Parsing {league} SQL dump: {filepath}")
+    logger.info(f"Parsing {league} batter CSV: {filepath}")
 
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
+    def _int(val: str):
+        v = val.strip()
+        return int(v) if v else None
 
-    match = re.search(r"INSERT INTO\s+`\w+`\s+VALUES\s*(.*?);", content, re.DOTALL)
-    if not match:
-        raise ValueError(f"No INSERT VALUES block found in {filepath}")
+    def _float(val: str):
+        v = val.strip()
+        return float(v) if v else None
 
-    values_block = match.group(1)
-    row_pattern = re.compile(r"\(([^)]+)\)")
+    def _clean_name(raw: str) -> str:
+        # Baseball Reference appends '#' (switch hitter) or '*' (left-handed)
+        return raw.replace("#", "").replace("*", "").strip()
 
-    # 1st pass: collect names that have a 2TM/3TM aggregate row
+    with open(filepath, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        all_rows = list(reader)
+
+    # 1st pass: collect traded player names
     traded_names = set()
-    for row_match in row_pattern.finditer(values_block):
-        raw_row = row_match.group(1)
-        fields = re.findall(r"'(?:[^'\\]|\\.)*'|[^,]+", raw_row)
-        fields = [f.strip().strip("'") for f in fields]
-        try:
-            name = fields[0]
-            team = fields[2]
-        except IndexError:
+    for row in all_rows:
+        if not row.get("Player", "").strip():
             continue
-        if team in ("2TM", "3TM"):
-            traded_names.add(name)
+        if row["Team"] in ("2TM", "3TM"):
+            traded_names.add(_clean_name(row["Player"]))
 
     # 2nd pass: parse rows
     rows = []
-    for row_match in row_pattern.finditer(values_block):
-        raw_row = row_match.group(1)
-        fields = re.findall(r"'(?:[^'\\]|\\.)*'|[^,]+", raw_row)
-        fields = [f.strip().strip("'") for f in fields]
-
-        try:
-            if league == "AL":
-                name, position, team = fields[0], fields[1], fields[2]
-                position = _normalize_position_al(position)
-                ab  = int(fields[3])    if fields[3]  else None
-                r   = int(fields[4])    if fields[4]  else None
-                h   = int(fields[5])    if fields[5]  else None
-                hr  = int(fields[6])    if fields[6]  else None
-                dbl = int(fields[7])    if fields[7]  else None
-                trp = int(fields[8])    if fields[8]  else None
-                rbi = int(fields[9])    if fields[9]  else None
-                bb  = int(fields[10])   if fields[10] else None
-                k   = int(fields[11])   if fields[11] else None
-                sb  = int(fields[12])   if fields[12] else None
-                cs  = int(fields[13])   if fields[13] else None
-                avg = float(fields[14]) if fields[14] else None
-                obp = float(fields[15]) if fields[15] else None
-                slg = float(fields[16]) if fields[16] else None
-                sng = (h - dbl - trp - hr) if all(
-                    v is not None for v in [h, dbl, trp, hr]
-                ) else None
-
-            else:  # NL
-                name, position, team = fields[0], fields[1], fields[2]
-                position = _normalize_position_nl(position)
-                ab  = int(fields[3])    if fields[3]  else None
-                r   = int(fields[4])    if fields[4]  else None
-                h   = int(fields[5])    if fields[5]  else None
-                sng = int(fields[6])    if fields[6]  else None
-                dbl = int(fields[7])    if fields[7]  else None
-                trp = int(fields[8])    if fields[8]  else None
-                hr  = int(fields[9])    if fields[9]  else None
-                rbi = int(fields[10])   if fields[10] else None
-                bb  = int(fields[11])   if fields[11] else None
-                k   = int(fields[12])   if fields[12] else None
-                sb  = int(fields[13])   if fields[13] else None
-                cs  = int(fields[14])   if fields[14] else None
-                avg = float(fields[15]) if fields[15] else None
-                obp = float(fields[16]) if fields[16] else None
-                slg = float(fields[17]) if fields[17] else None
-
-        except (IndexError, ValueError):
+    for row in all_rows:
+        raw_player = row.get("Player", "").strip()
+        if not raw_player:
             continue
 
-        # Traded player handling
-        if name in traded_names:
-            if team not in ("2TM", "3TM"):
-                continue
-            team = "TOT"
-        else:
-            if team in ("2TM", "3TM"):
-                continue
+        try:
+            name     = _clean_name(raw_player)
+            team     = row["Team"].strip()
+            position = _normalize_position_al(row["Pos"])
 
-        team = TEAM_ABBR_MAP.get(team, team)
+            # Traded player handling
+            if name in traded_names:
+                if team not in ("2TM", "3TM"):
+                    continue
+                team = "TOT"
+            else:
+                if team in ("2TM", "3TM"):
+                    continue
+
+            team = TEAM_ABBR_MAP.get(team, team)
+
+            ab  = _int(row["AB"])
+            r   = _int(row["R"])
+            h   = _int(row["H"])
+            dbl = _int(row["2B"])
+            trp = _int(row["3B"])
+            hr  = _int(row["HR"])
+            rbi = _int(row["RBI"])
+            bb  = _int(row["BB"])
+            k   = _int(row["SO"])
+            sb  = _int(row["SB"])
+            cs  = _int(row["CS"])
+            avg = _float(row["BA"])
+            obp = _float(row["OBP"])
+            slg = _float(row["SLG"])
+            sng = (h - dbl - trp - hr) if all(
+                v is not None for v in [h, dbl, trp, hr]
+            ) else None
+
+        except (KeyError, ValueError):
+            continue
 
         # Skip pitchers — batter tables contain batters only
         # TWP (Two-Way Players) are allowed through to batter table
@@ -491,149 +476,130 @@ def parse_batter_sql_dump(filepath: str, league: str, api_lookup: dict = None) -
             "avg": avg, "obp": obp, "slg": slg,
         })
 
-    logger.info(f"Parsed {len(rows)} rows from {league} dump")
+    logger.info(f"Parsed {len(rows)} rows from {league} batter CSV")
     return rows
 
 
-# ── Step 2b: Parse pitcher SQL dump files ─────────────────────────────────────
+# ── Step 2b: Parse pitcher CSV files ─────────────────────────────────────────
 
-def parse_pitcher_sql_dump(filepath: str, league: str, api_lookup: dict = None) -> list[dict]:
+def parse_pitcher_csv(filepath: str, league: str, api_lookup: dict = None) -> list[dict]:
     """
-    Parse an AL or NL pitcher SQL dump file (UTF-8, pre-converted from UTF-16LE)
-    and return a list of row dicts.
+    Parse an AL or NL pitcher CSV file (UTF-8 with BOM) and return a list of row dicts.
 
-    Two-pass parsing for traded players:
-      - 1st pass: collect names that have a 2TM/3TM aggregate row
-      - 2nd pass: for those names, skip per-team rows and save 2TM/3TM row as team="TOT"
+    Both AL and NL CSV files share the same column layout:
+      Rk, Player, Age, Team, WAR, W, L, W-L%, ERA, G, GS, GF, CG, SHO, SV,
+      IP, H, R, ER, HR, BB, IBB, SO, HBP, BK, WP, BF,
+      ERA+, FIP, WHIP, H9, HR9, BB9, SO9, SO/BB
 
-    Column layout (35 columns, 0-indexed):
-      [0]Rk, [1]Player, [2]Age, [3]Team, [4]WAR,
-      [5]W, [6]L, [7]W-L%, [8]ERA, [9]G, [10]GS,
-      [11]GF, [12]CG, [13]SHO, [14]SV, [15]IP,
-      [16]H, [17]R, [18]ER, [19]HR, [20]BB,
-      [21]IBB, [22]SO, [23]HBP, [24]BK, [25]WP,
-      [26]BF, [27]ERA+, [28]FIP, [29]WHIP,
-      [30]H9, [31]HR9, [32]BB9, [33]SO9, [34]SO/BB
+    Two-pass logic for traded players:
+      - 1st pass: collect Player names that appear with Team 2TM or 3TM
+      - 2nd pass: for traded players, keep only the 2TM/3TM aggregate row (team="TOT");
+                  for single-team players, keep as-is
 
     Filtering rules:
-      - Skip non-aggregate per-team rows for traded players
-      - Skip non-pitcher rows: IP < 10.0
-      - Skip trailing NULL rows: Player is NULL or empty
+      - Skip rows with empty Player field
+      - Skip rows with IP < 10.0 (position players with mop-up appearances)
     """
-    logger.info(f"Parsing {league} pitcher SQL dump: {filepath}")
+    logger.info(f"Parsing {league} pitcher CSV: {filepath}")
 
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
+    def _int(val: str):
+        v = val.strip()
+        return int(v) if v else None
 
-    match = re.search(r"INSERT INTO\s+`\w+`\s+VALUES\s*(.*?);", content, re.DOTALL)
-    if not match:
-        raise ValueError(f"No INSERT VALUES block found in {filepath}")
+    def _float(val: str):
+        v = val.strip()
+        return float(v) if v else None
 
-    values_block = match.group(1)
-    row_pattern  = re.compile(r"\(([^)]+)\)")
+    def _clean_name(raw: str) -> str:
+        return raw.replace("#", "").replace("*", "").strip()
+
+    with open(filepath, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        all_rows = list(reader)
 
     # 1st pass: collect traded player names
     traded_names = set()
-    for row_match in row_pattern.finditer(values_block):
-        raw_row = row_match.group(1)
-        fields  = re.findall(r"'(?:[^'\\]|\\.)*'|[^,]+", raw_row)
-        fields  = [f.strip().strip("'") for f in fields]
-        try:
-            name = fields[1].replace("*", "").strip()
-            team = fields[3].strip()
-        except IndexError:
+    for row in all_rows:
+        if not row.get("Player", "").strip():
             continue
-        if team in ("2TM", "3TM"):
-            traded_names.add(name)
+        if row["Team"] in ("2TM", "3TM"):
+            traded_names.add(_clean_name(row["Player"]))
 
     # 2nd pass: parse rows
     rows = []
-    for row_match in row_pattern.finditer(values_block):
-        raw_row = row_match.group(1)
-        fields  = re.findall(r"'(?:[^'\\]|\\.)*'|[^,]+", raw_row)
-        fields  = [f.strip().strip("'") for f in fields]
+    for row in all_rows:
+        raw_player = row.get("Player", "").strip()
+        if not raw_player:
+            continue
 
         try:
-            raw_name = fields[1].replace("*", "").strip()
-            if not raw_name or raw_name.upper() == "NULL":
-                continue
-
-            team = fields[3].strip()
+            name = _clean_name(raw_player)
+            team = row["Team"].strip()
 
             # Traded player handling
-            if raw_name in traded_names:
+            if name in traded_names:
                 if team not in ("2TM", "3TM"):
-                    continue  # skip per-team rows
+                    continue
                 team = "TOT"
             else:
                 if team in ("2TM", "3TM"):
-                    continue  # safety guard
+                    continue
 
             team = TEAM_ABBR_MAP.get(team, team)
 
-            def _int(val: str):
-                v = val.strip()
-                return int(v) if v and v.upper() != "NULL" else None
-
-            def _float(val: str):
-                v = val.strip()
-                return float(v) if v and v.upper() != "NULL" else None
-
-            ip = _float(fields[15])
+            ip = _float(row["IP"])
 
             # Skip non-pitchers (position players with mop-up appearances)
-            # TWP (Two-Way Players) with sufficient IP are allowed through to pitcher table
             if ip is None or ip < 10.0:
                 continue
 
             # For TWP: confirm via MLB API that this player is a Two-Way Player
             if api_lookup:
-                candidate = api_lookup.get(build_match_key(raw_name, team)) \
-                            or api_lookup.get(build_match_key(raw_name))
+                candidate = api_lookup.get(build_match_key(name, team)) \
+                            or api_lookup.get(build_match_key(name))
                 if candidate:
                     pos_abbr = candidate.get("primaryPosition", {}).get("abbreviation")
-                    # Non-pitcher, non-TWP appearing in pitcher dump — skip
                     if pos_abbr not in ("P", "TWP"):
                         continue
 
             rows.append({
-                "name":     raw_name,
+                "name":     name,
                 "position": "P",
                 "team":     team,
 
                 # FVARz inputs
-                "w":    _int(fields[5]),
-                "sv":   _int(fields[14]),
-                "so":   _int(fields[22]),
-                "era":  _float(fields[8]),
-                "whip": _float(fields[29]),
+                "w":    _int(row["W"]),
+                "sv":   _int(row["SV"]),
+                "so":   _int(row["SO"]),
+                "era":  _float(row["ERA"]),
+                "whip": _float(row["WHIP"]),
                 "ip":   ip,
 
                 # Reference stats
-                "l":        _int(fields[6]),
-                "g":        _int(fields[9]),
-                "gs":       _int(fields[10]),
-                "war":      _float(fields[4]),
-                "fip":      _float(fields[28]),
-                "h":        _int(fields[16]),
-                "r":        _int(fields[17]),
-                "er":       _int(fields[18]),
-                "hr":       _int(fields[19]),
-                "bb":       _float(fields[20]),
-                "hbp":      _int(fields[23]),
-                "bf":       _int(fields[26]),
-                "era_plus": _float(fields[27]),
-                "h9":       _float(fields[30]),
-                "hr9":      _float(fields[31]),
-                "bb9":      _float(fields[32]),
-                "so9":      _float(fields[33]),
-                "so_bb":    _float(fields[34]),
+                "l":        _int(row["L"]),
+                "g":        _int(row["G"]),
+                "gs":       _int(row["GS"]),
+                "war":      _float(row["WAR"]),
+                "fip":      _float(row["FIP"]),
+                "h":        _int(row["H"]),
+                "r":        _int(row["R"]),
+                "er":       _int(row["ER"]),
+                "hr":       _int(row["HR"]),
+                "bb":       _float(row["BB"]),
+                "hbp":      _int(row["HBP"]),
+                "bf":       _int(row["BF"]),
+                "era_plus": _float(row["ERA+"]),
+                "h9":       _float(row["H9"]),
+                "hr9":      _float(row["HR9"]),
+                "bb9":      _float(row["BB9"]),
+                "so9":      _float(row["SO9"]),
+                "so_bb":    _float(row["SO/BB"]),
             })
 
-        except (IndexError, ValueError):
+        except (KeyError, ValueError):
             continue
 
-    logger.info(f"Parsed {len(rows)} pitcher rows from {league} dump")
+    logger.info(f"Parsed {len(rows)} pitcher rows from {league} CSV")
     return rows
 
 
@@ -877,10 +843,10 @@ def run():
 
     api_lookup, team_id_to_abbr, team_id_to_league = fetch_api_players()
 
-    al_batter_rows  = parse_batter_sql_dump(AL_BATTER_SQL_PATH, "AL", api_lookup)
-    nl_batter_rows  = parse_batter_sql_dump(NL_BATTER_SQL_PATH, "NL", api_lookup)
-    al_pitcher_rows = parse_pitcher_sql_dump(AL_PITCHER_SQL_PATH, "AL", api_lookup)
-    nl_pitcher_rows = parse_pitcher_sql_dump(NL_PITCHER_SQL_PATH, "NL", api_lookup)
+    al_batter_rows  = parse_batter_csv(AL_BATTER_CSV_PATH, "AL", api_lookup)
+    nl_batter_rows  = parse_batter_csv(NL_BATTER_CSV_PATH, "NL", api_lookup)
+    al_pitcher_rows = parse_pitcher_csv(AL_PITCHER_CSV_PATH, "AL", api_lookup)
+    nl_pitcher_rows = parse_pitcher_csv(NL_PITCHER_CSV_PATH, "NL", api_lookup)
 
     db = SessionLocal()
     try:
