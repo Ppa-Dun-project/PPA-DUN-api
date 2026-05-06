@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from data.daily_update import run_daily_update
+from backend.data.pipeline.daily_update import run_daily_update
 import threading
 
 router = APIRouter(prefix="/admin")
