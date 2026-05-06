@@ -1,6 +1,6 @@
 from api.models.player import (
-    PlayerBidByNameRequest,
-    PlayerBidByNameResponse,
+    PlayerBidByIdRequest,
+    PlayerBidByIdResponse,
     PlayerBidRequest,
     PlayerValueRequest,
     BatterStats,
@@ -381,10 +381,10 @@ PITCHER_BID_NAME_COLUMNS = [
 ]
 
 
-@router.post("/player/bid/name", response_model=PlayerBidByNameResponse)
-def player_bid_by_name(request: PlayerBidByNameRequest):
+@router.post("/player/bid/id", response_model=PlayerBidByIdResponse)
+def player_bid_by_id(request: PlayerBidByIdRequest):
     """
-    POST /player/bid/name
+    POST /player/bid/id
 
     Accepts player_id, league_context, and draft_context.
     Fetches player stats from DB — searches batters first, then pitchers.

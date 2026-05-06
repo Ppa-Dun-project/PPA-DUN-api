@@ -33,7 +33,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # File handler for unmatched rows
-unmatched_handler = logging.FileHandler("init_players_unmatched.log")
+unmatched_handler = logging.FileHandler("init_players_unmatched.log", mode="w")
 unmatched_handler.setLevel(logging.WARNING)
 unmatched_logger = logging.getLogger("unmatched")
 unmatched_logger.addHandler(unmatched_handler)

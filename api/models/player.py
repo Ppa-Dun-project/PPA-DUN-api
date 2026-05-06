@@ -163,7 +163,7 @@ class PlayerBidResponse(BaseModel):
 
 # ── player_name Based Bid Models ──────────────────────────────────────────────
 
-class PlayerBidByNameRequest(BaseModel):
+class PlayerBidByIdRequest(BaseModel):
     player_id:      int            # MLB stable integer player ID (replaces player_name)
     league_context: LeagueContext
     draft_context:  DraftContext
@@ -190,7 +190,7 @@ class PitcherStatsSnapshot(BaseModel):
     whip: float | None
 
 
-class PlayerBidByNameResponse(BaseModel):
+class PlayerBidByIdResponse(BaseModel):
     player_name:    str
     player_type:    str             # "batter" or "pitcher"
     position:       str
