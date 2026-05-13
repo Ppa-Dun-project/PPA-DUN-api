@@ -556,9 +556,9 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
     # If my_roster is provided, derive remaining spots from roster_size - len(my_roster).
     # Otherwise, use the client-supplied my_remaining_roster_spots as-is.
     if dc.my_roster is not None:
-        my_remaining_roster_spots = lc.roster_size - len(dc.my_roster)
+        my_remaining_roster_spots = max(0, lc.roster_size - len(dc.my_roster))
     else:
-        my_remaining_roster_spots = dc.my_remaining_roster_spots
+        my_remaining_roster_spots = max(0, dc.my_remaining_roster_spots)
     min_reserve = max(0, my_remaining_roster_spots - 1)
     spendable   = max(1, dc.my_remaining_budget - min_reserve)
 
@@ -596,13 +596,13 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
             )
 
         max_competitor_budget = max(
-            dc.opponent_budgets.get(name, 0) for name in competing_opponents
+            max(0, dc.opponent_budgets.get(name, 0)) for name in competing_opponents
         )
         # Ensure at least 1 to avoid clipping recommended_bid below minimum
         max_competitor_budget = max(1, max_competitor_budget)
 
     # Step 7: draft progress adjustment
-    draft_progress   = dc.drafted_players_count / (lc.league_size * lc.roster_size)
+    draft_progress   = min(1.0, dc.drafted_players_count / (lc.league_size * lc.roster_size))
     budget_ratio     = spendable / dc.my_remaining_budget if dc.my_remaining_budget > 0 else 0.5
     draft_multiplier = 1.0 + (budget_ratio - 0.5) * 0.2 * draft_progress
     draft_adj        = adjusted_price * draft_multiplier - adjusted_price
