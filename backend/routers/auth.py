@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from db.session import get_db
 from db.models import User, APIKey
 
@@ -27,14 +27,11 @@ class GoogleLoginRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id:    int
     email: str
     name:  str
-
-    class Config:
-        # from_attributes=True allows Pydantic to read values directly from
-        # SQLAlchemy ORM objects (e.g., return user directly without .dict()).
-        from_attributes = True
 
 
 class APIKeyResponse(BaseModel):
