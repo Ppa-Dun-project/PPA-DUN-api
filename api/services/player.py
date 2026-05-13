@@ -70,11 +70,13 @@ def get_baselines(player_type: str) -> dict:
                 return _batter_baselines
             logger.warning("[baselines] batter cache empty — using fallback constants")
             return _BATTER_BASELINES_FALLBACK
-        else:
+        elif player_type == "pitcher":
             if _pitcher_baselines:
                 return _pitcher_baselines
             logger.warning("[baselines] pitcher cache empty — using fallback constants")
             return _PITCHER_BASELINES_FALLBACK
+        else:
+            raise ValueError(f"[get_baselines] Invalid player_type: '{player_type}'")
 
 # ── Normalization Ceilings ────────────────────────────────────────────────────
 # Z_MAX_* = approximate z_total of an all-time elite player in a single season.
@@ -312,7 +314,7 @@ def _compute_z_scores(blended: dict[str, float], player_type: str) -> float:
             + _zscore(blended["SB"],  b["SB"]["mean"],  b["SB"]["std"])
             + _zscore(blended["AVG"], b["AVG"]["mean"], b["AVG"]["std"])
         )
-    else:
+    elif player_type == "pitcher":
         p = get_baselines("pitcher")
         return (
             _zscore(blended["W"],    p["W"]["mean"],    p["W"]["std"])
@@ -321,6 +323,8 @@ def _compute_z_scores(blended: dict[str, float], player_type: str) -> float:
             - _zscore(blended["ERA"],  p["ERA"]["mean"],  p["ERA"]["std"])
             - _zscore(blended["WHIP"], p["WHIP"]["mean"], p["WHIP"]["std"])
         )
+    else:
+        raise ValueError(f"[_compute_z_scores] Invalid player_type: '{player_type}'")
 
 
 # ── STEP F: Positional Scarcity Bonus ────────────────────────────────────────
