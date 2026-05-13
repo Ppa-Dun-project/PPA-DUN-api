@@ -78,7 +78,6 @@ The `/demo/*` endpoints are open with a 10-req/min/IP cap so anyone can evaluate
 | `POST` | `/player/value`        | Compute player value (0–100)              | 🔒 |
 | `POST` | `/player/bid`          | Recommend auction bid in `$`              | 🔒 |
 | `POST` | `/player/bid/name`     | Bid by player name (auto-fetch stats)     | 🔒 |
-| `POST` | `/player/recalculate`  | Batch recalculate values                  | 🔒 |
 | `GET`  | `/players`             | List players (filterable)                 | 🔒 |
 | `GET`  | `/players/{id}`        | Single player details                     | 🔒 |
 | `POST` | `/demo/value`          | Same as `/player/value`, no key           | 10/min |
