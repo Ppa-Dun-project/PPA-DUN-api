@@ -41,7 +41,7 @@ unmatched_logger.addHandler(unmatched_handler)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-_DATA_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+_DATA_DIR = os.path.dirname(os.path.dirname(__file__))
 AL_BATTER_CSV_PATH  = os.path.join(_DATA_DIR, "raw_data", "AL_batters.csv")
 NL_BATTER_CSV_PATH  = os.path.join(_DATA_DIR, "raw_data", "NL_batters.csv")
 AL_PITCHER_CSV_PATH = os.path.join(_DATA_DIR, "raw_data", "AL_pitchers.csv")
