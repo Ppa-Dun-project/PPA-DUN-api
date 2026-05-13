@@ -86,15 +86,6 @@ Z_MAX_BATTER  = 10.0
 Z_MAX_PITCHER = 10.0
 RAW_MAX       = 12.0
 
-# ── Hitter / Pitcher Budget Split ─────────────────────────────────────────────
-# Standard Roto 5x5 auction convention: ~67% of budget goes to batters,
-# ~33% to pitchers. Used in base_price calculation.
-
-HIT_PITCH_RATIO = {
-    "batter":  0.67,
-    "pitcher": 0.33,
-}
-
 # ── Positional Scarcity Bonus ─────────────────────────────────────────────────
 # Added to z_total (in z-score units) before normalization.
 # Reflects the fact that scarce positions (C, SS) carry extra value
@@ -503,7 +494,7 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
 
     Full pipeline:
       Step 1 — player_value    = reuse compute_player_value()
-      Step 2 — base_price      = (player_value / 100) * total_budget * HIT_PITCH_RATIO
+      Step 2 — base_price      = (player_value / 100) * total_budget
       Step 3 — dynamic_bonus   = _get_dynamic_scarcity_bonus()
                early-exit      → recommended_bid = 1 if competitors_at_pos == 0
       Step 4 — adjusted_price  = base_price * scarcity_multiplier
@@ -533,8 +524,7 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
     pos = request.position.upper()
 
     # Step 2: base price proportional to player value and total league budget
-    ratio      = HIT_PITCH_RATIO.get(player_type, 0.5)
-    base_price = (player_value / 100.0) * lc.total_budget * ratio
+    base_price = (player_value / 100.0) * lc.total_budget
 
     # Step 3: dynamic scarcity bonus + early-exit check
     _, competitors_at_pos = _get_dynamic_scarcity_bonus(pos, dc.opponent_rosters)
