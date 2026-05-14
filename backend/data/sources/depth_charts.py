@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import requests
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -21,87 +20,81 @@ DATABASE_URL = "mysql+pymysql://root:{password}@{host}:3306/{db}".format(
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/125.0.0.0 Safari/537.36"
-    )
-}
+ESPN_TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams"
+ESPN_DEPTH_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/{team_id}/depthcharts"
 
-BASE_URL = "https://www.espn.com/mlb/team/depth/_/name/{slug}"
-
-# (ESPN slug, league)
-# League determines which table (batters_al or batters_nl) to update first
 TEAMS = [
     # AL
-    ("bal",  "AL"), ("bos",  "AL"), ("nyy",  "AL"), ("tb",   "AL"), ("tor",  "AL"),
-    ("chw",  "AL"), ("cle",  "AL"), ("det",  "AL"), ("kc",   "AL"), ("min",  "AL"),
-    ("hou",  "AL"), ("laa",  "AL"), ("ath",  "AL"), ("sea",  "AL"), ("tex",  "AL"),
+    ("BAL", "AL"), ("BOS", "AL"), ("NYY", "AL"), ("TB",  "AL"), ("TOR", "AL"),
+    ("CHW", "AL"), ("CLE", "AL"), ("DET", "AL"), ("KC",  "AL"), ("MIN", "AL"),
+    ("HOU", "AL"), ("LAA", "AL"), ("ATH", "AL"), ("SEA", "AL"), ("TEX", "AL"),
     # NL
-    ("ari",  "NL"), ("atl",  "NL"), ("chc",  "NL"), ("cin",  "NL"), ("col",  "NL"),
-    ("lad",  "NL"), ("mia",  "NL"), ("mil",  "NL"), ("nym",  "NL"), ("phi",  "NL"),
-    ("pit",  "NL"), ("sd",   "NL"), ("sf",   "NL"), ("stl",  "NL"), ("wsh",  "NL"),
+    ("ARI", "NL"), ("ATL", "NL"), ("CHC", "NL"), ("CIN", "NL"), ("COL", "NL"),
+    ("LAD", "NL"), ("MIA", "NL"), ("MIL", "NL"), ("NYM", "NL"), ("PHI", "NL"),
+    ("PIT", "NL"), ("SD",  "NL"), ("SF",  "NL"), ("STL", "NL"), ("WSH", "NL"),
 ]
 
 
 # ── Scrape ────────────────────────────────────────────────────────────────────
 
-def _scrape_team(slug: str) -> list[dict]:
+def _fetch_espn_team_ids() -> dict[str, int]:
     """
-    Scrape depth chart for one team from ESPN.
-    Returns list of dicts: {player_name, position, depth_order}
-
-    ESPN depth chart page layout:
-      Table 0: position labels column (P, RP, CL, C, 1B, ...)
-      Table 1: player grid (row = position, col = depth_order 1..N)
+    Fetch ESPN team_id for all MLB teams via ESPN teams API.
+    Returns dict of {abbreviation (upper): espn_team_id}.
     """
-    url  = BASE_URL.format(slug=slug)
-    resp = requests.get(url, headers=HEADERS, timeout=15)
+    resp  = requests.get(ESPN_TEAMS_URL, timeout=15)
     resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
+    teams = (
+        resp.json()
+        .get("sports", [{}])[0]
+        .get("leagues", [{}])[0]
+        .get("teams", [])
+    )
+    result = {}
+    for entry in teams:
+        team = entry.get("team", {})
+        abbr = team.get("abbreviation", "").upper()
+        tid  = team.get("id")
+        if abbr and tid:
+            result[abbr] = int(tid)
+    logger.info(f"[depth] fetched {len(result)} ESPN team IDs")
+    return result
 
-    tables = soup.find_all("table")
-    if len(tables) < 2:
-        logger.warning(f"[depth] {slug}: expected 2 tables, got {len(tables)}")
-        return []
 
-    pos_table  = tables[0]   # position label column
-    data_table = tables[1]   # player grid
 
-    # Extract position labels (skip header row)
-    positions = [
-        row.find(["td", "th"]).get_text(strip=True)
-        for row in pos_table.find_all("tr")[1:]
-        if row.find(["td", "th"])
-    ]
+PITCHER_POSITIONS = {"SP", "RP", "CP"}
 
-    PITCHER_POSITIONS = {"P", "RP", "CL"}
+def _fetch_team_depth(team_id: int, abbr: str) -> list[dict]:
+    """
+    Fetch depth chart for one team via ESPN JSON API.
+    Returns list of dicts: {player_name, position, depth_order, is_pitcher}
+    """
+    url  = ESPN_DEPTH_URL.format(team_id=team_id)
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
 
     rows = []
-    for row_idx, tr in enumerate(data_table.find_all("tr")[1:]):
-        if row_idx >= len(positions):
-            break
-        position = positions[row_idx]
+    depthchart = data.get("depthchart", [])
+    if not depthchart:
+        return []
 
+    positions_map = depthchart[0].get("positions", {})
+
+    for pos_key, pos_data in positions_map.items():
+        position   = pos_data.get("position", {}).get("abbreviation", "").upper()
         is_pitcher = position in PITCHER_POSITIONS
+        athletes   = pos_data.get("athletes", [])
 
-        for depth_order, td in enumerate(tr.find_all("td"), start=1):
-            link = td.find("a", href=True)
-            if not link:
-                continue
-
-            player_name = link.get_text(strip=True)
-            if not player_name:
-                continue
-
-            rows.append({
-                "player_name": player_name,
-                "position":    position,
-                "depth_order": depth_order,
-                "is_pitcher":  is_pitcher,
-            })
-
+        for depth_order, athlete in enumerate(athletes, start=1):
+            name = athlete.get("displayName", "").strip()
+            if name:
+                rows.append({
+                    "player_name": name,
+                    "position":    position,
+                    "depth_order": depth_order,
+                    "is_pitcher":  is_pitcher,
+                })
     return rows
 
 
@@ -200,32 +193,42 @@ def fetch_and_update() -> None:
     """
     _reset_depth_order()
 
+    try:
+        team_id_map = _fetch_espn_team_ids()
+    except Exception as e:
+        logger.error(f"[depth] Failed to fetch ESPN team IDs: {e}")
+        return
+
     total_matched   = 0
     total_unmatched = 0
     failed_teams    = []
 
-    for slug, league in TEAMS:
+    for abbr, league in TEAMS:
+        team_id = team_id_map.get(abbr)
+        if team_id is None:
+            logger.warning(f"[depth] {abbr}: no ESPN team_id found, skipping")
+            failed_teams.append(abbr)
+            continue
+
         try:
-            rows = _scrape_team(slug)
+            rows = _fetch_team_depth(team_id, abbr)
             if not rows:
-                logger.warning(f"[depth] {slug}: no rows scraped")
-                failed_teams.append(slug)
+                logger.warning(f"[depth] {abbr}: no rows fetched")
+                failed_teams.append(abbr)
                 continue
 
             matched, unmatched = _update_players(rows, league)
             total_matched   += matched
             total_unmatched += unmatched
             logger.info(
-                f"[depth] {slug}: scraped={len(rows)} "
+                f"[depth] {abbr}: fetched={len(rows)} "
                 f"matched={matched} unmatched={unmatched}"
             )
-
-            # Polite delay to avoid hammering ESPN
-            time.sleep(2)
+            time.sleep(0.5)
 
         except Exception as e:
-            logger.error(f"[depth] {slug}: failed — {e}")
-            failed_teams.append(slug)
+            logger.error(f"[depth] {abbr}: failed — {e}")
+            failed_teams.append(abbr)
 
     logger.info(
         f"[depth] done | total_matched={total_matched} "
