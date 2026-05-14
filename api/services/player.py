@@ -469,10 +469,12 @@ def compute_player_value(request: PlayerValueRequest) -> PlayerValueResponse:
     risk_penalty = _get_risk_penalty(stats, blended)
 
     # STEP H: normalize to [0.0, 100.0]
+    # Shift by z_max/RAW_MAX so that an average player (raw_score=0) maps to 50.
+    # Range: [-RAW_MAX, +RAW_MAX] → [0, 100]
     z_max        = Z_MAX_BATTER if player_type == "batter" else Z_MAX_PITCHER
     raw_score    = z_total + position_bonus - risk_penalty
-    stat_score   = _normalize(z_total,   z_max)
-    player_value = _normalize(raw_score, RAW_MAX)
+    stat_score   = _normalize(z_total   + z_max,   z_max   * 2)
+    player_value = _normalize(raw_score + RAW_MAX,  RAW_MAX * 2)
 
     # Scale bonus and penalty to 0~100 for readable response breakdown
     bonus_scaled   = _normalize(position_bonus, RAW_MAX)

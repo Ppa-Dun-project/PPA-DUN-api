@@ -34,14 +34,29 @@ PITCHER_COLUMN_TO_STAT = {
 # daily_update.py POSTs computed baselines here after each run.
 API_RELOAD_URL = "http://api:8000/internal/reload-baselines"
 
+# ── Baseline eligibility filters ─────────────────────────────────────────────
+# Only players with meaningful playing time are included in baseline calculation.
+# Including bench/inactive players skews mean/std toward zero and causes
+# most rostered players to receive player_value = 0.
+
+MIN_AB = 100   # batters:  minimum at-bats to be included in baseline pool
+MIN_IP = 20    # pitchers: minimum innings pitched to be included in baseline pool
 
 def _fetch_column(db: Session, table: str, column: str) -> list[float]:
     """
-    Fetch all non-NULL values of a single column from a player table.
+    Fetch non-NULL values of a single column from a player table.
+    Filters to players with meaningful playing time to prevent bench/inactive
+    players from skewing the baseline mean and std toward zero.
     Returns a list of floats. Returns empty list if no rows found.
     """
+    if table.startswith("batters"):
+        where = f"{column} IS NOT NULL AND ab >= {MIN_AB}"
+    elif table.startswith("pitchers"):
+        where = f"{column} IS NOT NULL AND ip >= {MIN_IP}"
+    else:
+        where = f"{column} IS NOT NULL"
     rows = db.execute(
-        text(f"SELECT {column} FROM {table} WHERE {column} IS NOT NULL")
+        text(f"SELECT {column} FROM {table} WHERE {where}")
     ).fetchall()
     return [float(row[0]) for row in rows]
 
