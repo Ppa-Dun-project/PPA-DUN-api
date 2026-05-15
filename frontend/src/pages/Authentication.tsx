@@ -192,6 +192,17 @@ function Authentication() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  // ── handleLogout ──────────────────────────────────────────────────────────
+  // Clears all auth state and returns to the login screen.
+  // sessionStorage cleanup is handled automatically by the useEffect that
+  // watches user and token — setting both to null/"" triggers removeItem.
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken("");
+    setApiKeys([]);
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -229,7 +240,15 @@ function Authentication() {
 
             {/* User info card */}
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-bold text-white/40 uppercase mb-2">Signed in as</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-white/40 uppercase">Signed in as</p>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
+                >
+                  Logout
+                </button>
+              </div>
               <p className="text-white font-bold">{user.name}</p>
               <p className="text-sm text-white/50">{user.email}</p>
             </div>
