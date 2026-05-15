@@ -51,6 +51,7 @@ function Authentication() {
   // copied tracks which key was just copied to clipboard for the 2-second
   // "Copied!" feedback state. Stores the key string, or null if none.
   const [copied, setCopied]   = useState<string | null>(null);
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   // ── Sync auth state to sessionStorage ────────────────────────────────────
   // Runs whenever user or token changes.
@@ -172,6 +173,15 @@ function Authentication() {
     }
   };
 
+  // ── toggleKeyVisibility ───────────────────────────────────────────────────────
+  const toggleKeyVisibility = (key: string) => {
+  setVisibleKeys((prev) => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
+};
+
   // ── copyToClipboard ───────────────────────────────────────────────────────
   // Copies the key string to the system clipboard and shows a "Copied!" label
   // for 2 seconds before reverting back to "Copy".
@@ -250,10 +260,19 @@ function Authentication() {
                       key={k.key}
                       className="rounded-2xl border border-white/10 bg-black/40 p-4 flex items-center justify-between gap-4"
                     >
-                      {/* Key value — truncated with CSS if too long for the container */}
-                      <code className="text-sm text-white/80 truncate">{k.key}</code>
+                      {/* Key value — masked by default; revealed when key is in visibleKeys */}
+                      <code className="text-sm text-white/80 truncate">
+                        {visibleKeys.has(k.key) ? k.key : "••••••••••••••••••••••••••••••••"}
+                      </code>
                       <div className="flex gap-2 shrink-0">
-                        {/* Copy button: shows "Copied!" for 2s after click */}
+                        {/* Show/Hide toggle button */}
+                        <button
+                          onClick={() => toggleKeyVisibility(k.key)}
+                          className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
+                        >
+                          {visibleKeys.has(k.key) ? "Hide" : "Show"}
+                        </button>
+                        {/* Copy button: always copies the full key regardless of display state */}
                         <button
                           onClick={() => copyToClipboard(k.key)}
                           className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
