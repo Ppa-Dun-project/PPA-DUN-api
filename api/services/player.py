@@ -124,23 +124,20 @@ TOTAL_ELIGIBLE = {
     "CL": 20,
 }
 
-# ── Positional Scarcity Multiplier ────────────────────────────────────────────
-# Applied to base_price (in dollars) during bid calculation.
-# Separate from POSITION_BONUS — this multiplier directly inflates the dollar
-# bid to reflect real auction market behavior.
+# ── Bid Value Scale ───────────────────────────────────────────────────────────
+# Maps player_value (0~100 quality score) to a realistic auction dollar range.
+# player_value is NOT a direct budget ratio — it is a relative quality score.
+# VALUE_SCALE is calibrated so that:
+#   player_value=100, total_budget=$260, roster_size=25
+#   → spendable_budget = 260 - 25 = $235
+#   → base_price = (100/100) * 235 * 0.27 ≈ $63  (elite player, Trout-level)
+#   player_value=50  → base_price ≈ $32  (solid starter)
+#   player_value=20  → base_price ≈ $13  (bench/streamer)
+# Positional scarcity is applied as a dollar add-on (dynamic_bonus_dollar)
+# sourced from _get_dynamic_scarcity_bonus(), NOT a separate multiplier.
+# This avoids double-counting with POSITION_BONUS already baked into player_value.
 
-SCARCITY_MULTIPLIER = {
-    "C":  1.15,
-    "SS": 1.08,
-    "2B": 1.05,
-    "SP": 1.05,
-    "RP": 1.05,
-    "CL": 1.05,
-    "3B": 1.02,
-    "1B": 1.00,
-    "OF": 1.00,
-    "DH": 1.00,
-}
+VALUE_SCALE = 0.27
 
 # ── Age Factor Table ──────────────────────────────────────────────────────────
 # Applied to blended_stat before z-score calculation (STEP B).
@@ -177,6 +174,19 @@ INJURY_PENALTY = {
     "60-Day IL":  0.7,
     "Out":        1.0,
 }
+
+# ── Auction Value Scale ───────────────────────────────────────────────────────
+# player_value (0~100) is a relative quality score, not a direct budget ratio.
+# Multiplying it straight against total_budget produces grossly inflated bids.
+# VALUE_SCALE converts player_value into a realistic dollar range:
+#   player_value=100 → ~$63  (elite, e.g. Trout-tier)
+#   player_value=50  → ~$31  (solid starter)
+#   player_value=20  → ~$13  (bench/streamer)
+# Formula: base_price = (player_value / 100) * spendable_budget * VALUE_SCALE
+# where spendable_budget = total_budget - roster_size  (reserve $1/slot)
+# Tuned against standard 12-team Roto 5x5 auction data ($260/team, 25-man roster).
+
+VALUE_SCALE = 0.27
 
 
 # ── Internal Helpers ──────────────────────────────────────────────────────────
@@ -329,59 +339,54 @@ def _compute_z_scores(blended: dict[str, float], player_type: str) -> float:
 
 # ── STEP F: Positional Scarcity Bonus ────────────────────────────────────────
 
+# Dollar premium added per unit of positional scarcity bonus (z-score unit → $).
+# Calibrated so that C (base_bonus=1.5) with no opponents drafted ≈ +$5 premium.
+SCARCITY_DOLLAR_PER_UNIT = 3.0
+
 def _get_dynamic_scarcity_bonus(
     position: str,
     opponent_rosters: dict[str, list] | None,
-) -> tuple[float, int]:
+    spendable_budget: float = 0.0,
+) -> float:
     """
-    Compute the positional scarcity bonus (in z-score units) and the number
-    of competitors who have already drafted the given position.
+    Compute the positional scarcity dollar bonus to add on top of base_price.
 
     When opponent_rosters is provided:
       1. Count total_drafted_at_pos across all opponent rosters.
-      2. Compute remaining_ratio = (total_eligible - total_drafted_at_pos)
-                                   / total_eligible
-      3. dynamic_bonus = base_bonus / remaining_ratio
+      2. Compute filled_ratio = total_drafted_at_pos / total_eligible
+         filled_ratio rises as more opponents draft this position,
+         reflecting how scarce remaining players at this position are.
+      3. dynamic_bonus_z = base_bonus * (1 + filled_ratio)
          capped at base_bonus * 2 to prevent runaway values.
+      4. dynamic_bonus_dollar = dynamic_bonus_z * SCARCITY_DOLLAR_PER_UNIT
 
     When opponent_rosters is not provided:
-      Falls back to static POSITION_BONUS constant.
+      Falls back to static POSITION_BONUS * SCARCITY_DOLLAR_PER_UNIT.
 
     Returns:
-      (bonus, competitors_at_pos)
-      bonus             — scarcity bonus in z-score units
-      competitors_at_pos — number of opponents who already have this position
-                           (0 triggers early-exit in compute_recommended_bid)
+      dynamic_bonus_dollar — dollar amount to add to base_price
     """
     pos        = position.upper()
     base_bonus = POSITION_BONUS.get(pos, 0.0)
 
-    # Fallback: no roster data provided
+    # Fallback: no roster data provided — use static bonus
     if opponent_rosters is None:
-        return base_bonus, -1   # -1 signals "no data" — early-exit will not trigger
+        return base_bonus * SCARCITY_DOLLAR_PER_UNIT
 
     # Count how many opponents have already drafted this position
-    competitors_at_pos = sum(
+    total_drafted = sum(
         1
         for roster in opponent_rosters.values()
         for entry in roster
         if entry.position.upper() == pos
     )
 
-    # Early-exit signal: no competitors need this position
-    # (caller checks this and returns recommended_bid = 1)
-    if competitors_at_pos == 0:
-        return base_bonus, 0
+    # Dynamic bonus: scarcity rises as more opponents fill this position
+    total_eligible  = TOTAL_ELIGIBLE.get(pos, 40)
+    filled_ratio    = min(total_drafted / total_eligible, 1.0)
+    dynamic_bonus_z = min(base_bonus * (1.0 + filled_ratio), base_bonus * 2.0)
 
-    # Dynamic bonus calculation
-    total_eligible     = TOTAL_ELIGIBLE.get(pos, 40)
-    total_drafted      = competitors_at_pos
-    remaining          = max(total_eligible - total_drafted, 1)  # floor at 1 to avoid division by zero
-    remaining_ratio    = remaining / total_eligible
-    raw_bonus          = base_bonus / remaining_ratio if remaining_ratio > 0 else base_bonus
-    dynamic_bonus      = min(raw_bonus, base_bonus * 2)          # cap at 2x base
-
-    return dynamic_bonus, competitors_at_pos
+    return dynamic_bonus_z * SCARCITY_DOLLAR_PER_UNIT
 
 
 # ── STEP G: Risk Penalty ──────────────────────────────────────────────────────
@@ -499,17 +504,22 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
     Compute recommended_bid (integer dollar amount) for auction drafts.
 
     Full pipeline:
-      Step 1 — player_value    = reuse compute_player_value()
-      Step 2 — base_price      = (player_value / 100) * total_budget
-      Step 3 — dynamic_bonus   = _get_dynamic_scarcity_bonus()
-               early-exit      → recommended_bid = 1 if competitors_at_pos == 0
-      Step 4 — adjusted_price  = base_price * scarcity_multiplier
-      Step 5 — spendable       = my_remaining_budget - (my_remaining_roster_spots - 1)
+      Step 1 — player_value      = reuse compute_player_value()
+      Step 2 — base_price        = (player_value / 100) * spendable_budget * VALUE_SCALE
+               spendable_budget  = total_budget - roster_size  ($1/slot reserved)
+               VALUE_SCALE=0.27  maps quality score → realistic dollar range (~$1–$63)
+      Step 3 — dynamic_bonus     = _get_dynamic_scarcity_bonus() → dollar add-on
+               replaces old SCARCITY_MULTIPLIER to avoid double-counting with
+               POSITION_BONUS already embedded in player_value
+      Step 4 — adjusted_price    = base_price + dynamic_bonus_dollar
+      Step 5 — spendable         = my_remaining_budget - (my_remaining_roster_spots - 1)
       Step 6 — max_competitor_budget:
                competing_opponents = opponents who have not yet filled target position
                max_competitor_budget = max(their remaining budgets)
                falls back to spendable if opponent_budgets not provided
       Step 7 — draft_progress adjustment
+               draft_multiplier: 0.9 (early) → 1.1 (late) based on draft progress
+               and how much of MY budget has been spent
       Step 8 — recommended_bid = clip(round(adjusted_price * draft_multiplier),
                                        1, min(spendable, max_competitor_budget))
     """
@@ -529,30 +539,20 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
     dc  = request.draft_context
     pos = request.position.upper()
 
-    # Step 2: base price proportional to player value and total league budget
-    base_price = (player_value / 100.0) * lc.total_budget
+    # Step 2: base price using VALUE_SCALE to map quality score → realistic dollar amount.
+    # spendable_budget reserves $1 per roster slot (minimum bid constraint).
+    # VALUE_SCALE (0.27) is calibrated so player_value=100 → ~$63 on a $260/25-slot budget.
+    spendable_budget = lc.total_budget - lc.roster_size
+    base_price = (player_value / 100.0) * spendable_budget * VALUE_SCALE
 
-    # Step 3: dynamic scarcity bonus + early-exit check
-    _, competitors_at_pos = _get_dynamic_scarcity_bonus(pos, dc.opponent_rosters)
-    if competitors_at_pos == 0:
-        return PlayerBidResponse(
-            player_name=request.player_name,
-            player_type=player_type,
-            player_value=player_value,
-            recommended_bid=1,
-            bid_breakdown=BidBreakdown(
-                base_price=round(base_price, 2),
-                scarcity_adjustment=0.0,
-                draft_adjustment=0.0,
-                max_spendable=1,
-                max_competitor_budget=1,
-            ),
-        )
+    # Step 3: dynamic scarcity dollar bonus
+    # Replaces old SCARCITY_MULTIPLIER — additive to avoid double-counting with
+    # POSITION_BONUS already baked into player_value via compute_player_value().
+    dynamic_bonus_dollar = _get_dynamic_scarcity_bonus(pos, dc.opponent_rosters, spendable_budget)
 
-    # Step 4: apply positional scarcity multiplier
-    multiplier     = SCARCITY_MULTIPLIER.get(pos, 1.0)
-    adjusted_price = base_price * multiplier
-    scarcity_adj   = adjusted_price - base_price
+    # Step 4: adjusted price = base + scarcity add-on
+    adjusted_price = base_price + dynamic_bonus_dollar
+    scarcity_adj   = dynamic_bonus_dollar
 
     # Step 5: compute spendable — each remaining roster slot costs at least $1
     # If my_roster is provided, derive remaining spots from roster_size - len(my_roster).
@@ -604,10 +604,16 @@ def compute_recommended_bid(request: PlayerBidRequest, player_value: float | Non
         max_competitor_budget = max(1, max_competitor_budget)
 
     # Step 7: draft progress adjustment
-    draft_progress   = min(1.0, dc.drafted_players_count / (lc.league_size * lc.roster_size))
-    budget_ratio     = spendable / dc.my_remaining_budget if dc.my_remaining_budget > 0 else 0.5
-    draft_multiplier = 1.0 + (budget_ratio - 0.5) * 0.2 * draft_progress
-    draft_adj        = adjusted_price * draft_multiplier - adjusted_price
+    # draft_progress: fraction of total roster slots filled across the league (0.0 ~ 1.0)
+    # budget_spent_ratio: fraction of MY budget already spent (rises as draft progresses)
+    # draft_multiplier: 0.9 (early, budget abundant) → 1.1 (late, budget tight)
+    total_slots        = lc.league_size * lc.roster_size
+    draft_progress     = min(1.0, dc.drafted_players_count / total_slots) if total_slots > 0 else 0.0
+    budget_spent       = max(0.0, lc.total_budget - dc.my_remaining_budget)
+    budget_spent_ratio = budget_spent / lc.total_budget if lc.total_budget > 0 else 0.0
+    # Multiplier rises from 0.9 to 1.1 as draft progresses and budget depletes
+    draft_multiplier   = 0.9 + 0.2 * (draft_progress * 0.5 + budget_spent_ratio * 0.5)
+    draft_adj          = adjusted_price * draft_multiplier - adjusted_price
 
     # Step 8: clip to [1, min(spendable, max_competitor_budget)]
     effective_cap   = min(spendable, max_competitor_budget)
