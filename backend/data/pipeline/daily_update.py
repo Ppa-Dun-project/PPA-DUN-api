@@ -308,9 +308,43 @@ def run_daily_update() -> None:
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
+def _external_fetch_cycle() -> None:
+    """Lightweight fetch loop that runs every 15 min — only injuries + depth charts.
+    These are cheap external HTTP calls and the data drives the user-facing
+    notification system, so we want low-latency propagation."""
+    logger.info("=== External fetch cycle started ===")
+    try:
+        _step_injuries()
+    except Exception as e:
+        logger.error(f"[external_fetch] injuries failed: {e}")
+    try:
+        _step_depth_charts()
+    except Exception as e:
+        logger.error(f"[external_fetch] depth_charts failed: {e}")
+    logger.info("=== External fetch cycle finished ===")
+
+
+def _full_recalc_cycle() -> None:
+    """Heavy recalc loop that runs once daily at 3 AM ET — baselines +
+    player_value across all ~1300 players. Kept on the original daily cadence
+    to avoid CPU thrash and external API load."""
+    logger.info("=== Full recalc cycle started ===")
+    try:
+        _step_baselines()
+    except Exception as e:
+        logger.error(f"[full_recalc] baselines failed: {e}")
+    try:
+        _step_recalculate()
+    except Exception as e:
+        logger.error(f"[full_recalc] player_value recalc failed: {e}")
+    logger.info("=== Full recalc cycle finished ===")
+
+
 def start_scheduler():
     """
-    Start a background scheduler that runs run_daily_update() at 3:00 AM ET daily.
+    Start a background scheduler with two jobs:
+      - external_fetch: every 15 min (injuries + depth charts)
+      - full_recalc:    daily at 3 AM ET (baselines + player_value recalc)
     Returns the scheduler instance so the caller can shut it down on app exit.
     Called from backend/main.py lifespan event.
     """
@@ -323,13 +357,19 @@ def start_scheduler():
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(
-        run_daily_update,
+        _external_fetch_cycle,
+        trigger=CronTrigger(minute="*/15"),
+        id="external_fetch",
+        name="External fetch — injuries + depth (every 15 min)",
+    )
+    scheduler.add_job(
+        _full_recalc_cycle,
         trigger=CronTrigger(hour=3, minute=0, timezone="America/New_York"),
-        id="daily_update",
-        name="Daily MLB data update — 3AM ET",
+        id="full_recalc",
+        name="Full recalc — baselines + player_value (3AM ET daily)",
     )
     scheduler.start()
-    logger.info("Scheduler started — daily_update runs at 3:00 AM ET")
+    logger.info("Scheduler started — external_fetch every 15 min, full_recalc at 3AM ET")
     return scheduler
 
 
