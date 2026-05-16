@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'api/**'
-      - 'api/Dockerfile'
+      - 'Dockerfile'
 
 env:
   GCP_ZONE: us-east1-b
