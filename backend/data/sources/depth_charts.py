@@ -163,6 +163,30 @@ def _update_players(rows: list[dict], league: str) -> tuple[int, int]:
     return matched, unmatched
 
 
+# ── Snapshot for reactive recalc ─────────────────────────────────────────────
+
+def _snapshot_depth_order() -> dict[int, int | None]:
+    """
+    4개 player 테이블에서 (player_id → depth_order) 매핑 한 번에 가져옴.
+
+    Reactive recalc용: fetch 전/후로 두 번 찍어서 비교하면
+    어떤 선수의 depth_order가 진짜로 바뀌었는지 알 수 있음.
+    None (= 뎁스 차트에 없음) 그대로 저장해서 None ↔ 숫자 변화도 잡힘.
+    """
+    db  = SessionLocal()
+    out = {}
+    try:
+        for table in ("batters_al", "batters_nl", "pitchers_al", "pitchers_nl"):
+            rows = db.execute(
+                text(f"SELECT player_id, depth_order FROM {table}")
+            ).fetchall()
+            for r in rows:
+                out[r._mapping["player_id"]] = r._mapping["depth_order"]
+    finally:
+        db.close()
+    return out
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def _reset_depth_order() -> None:
@@ -190,7 +214,18 @@ def fetch_and_update() -> None:
     """
     Scrape ESPN depth charts for all 30 teams and update batter and pitcher tables.
     Called by daily_update.py.
+
+    Reactive recalc 통합 (2026-05):
+      fetch 전/후로 depth_order snapshot을 떠서 비교 →
+      진짜 바뀐 선수만 player_value 즉시 재계산.
+      → bid가 다음 3시 full recalc까지 stale하지 않고
+        30분 fetch cycle 내에 회복됨.
     """
+    # ── Reactive recalc 준비 ──
+    # reset 전에 옛 depth_order snapshot. 나중에 새 snapshot과 비교해
+    # 진짜 변경된 player_id만 추출 (보통 사이클당 0~5명).
+    old_depth_by_pid = _snapshot_depth_order()
+
     _reset_depth_order()
 
     try:
@@ -235,6 +270,20 @@ def fetch_and_update() -> None:
         f"| total_unmatched={total_unmatched} "
         f"| failed_teams={failed_teams}"
     )
+
+    # ── Reactive recalc 실행 ──
+    # 새 snapshot 뜨고 old vs new 비교 → depth 바뀐 player_id만 player_value 재계산.
+    # 라인업 변경 (예: 1군 → 2군)이 즉시 bid에 반영됨.
+    new_depth_by_pid = _snapshot_depth_order()
+    changed_ids = [
+        pid for pid, new_d in new_depth_by_pid.items()
+        if old_depth_by_pid.get(pid) != new_d
+    ]
+    if changed_ids:
+        # lazy import — 모듈 로딩 시점 순환 의존 회피
+        from data.pipeline.recalc import recalculate_players
+        logger.info(f"[depth] {len(changed_ids)} player(s) depth changed — triggering reactive recalc")
+        recalculate_players(changed_ids)
 
 
 if __name__ == "__main__":
