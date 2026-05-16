@@ -343,7 +343,7 @@ def _full_recalc_cycle() -> None:
 def start_scheduler():
     """
     Start a background scheduler with two jobs:
-      - external_fetch: every 15 min (injuries + depth charts)
+      - external_fetch: every 30 min (injuries + depth charts)
       - full_recalc:    daily at 3 AM ET (baselines + player_value recalc)
     Returns the scheduler instance so the caller can shut it down on app exit.
     Called from backend/main.py lifespan event.
@@ -358,9 +358,9 @@ def start_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         _external_fetch_cycle,
-        trigger=CronTrigger(minute="*/15"),
+        trigger=CronTrigger(minute="*/30"),
         id="external_fetch",
-        name="External fetch — injuries + depth (every 15 min)",
+        name="External fetch — injuries + depth (every 30 min)",
     )
     scheduler.add_job(
         _full_recalc_cycle,

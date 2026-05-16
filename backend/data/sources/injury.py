@@ -138,6 +138,30 @@ def _fetch_from_html() -> list[dict]:
     return rows
 
 
+# ── Snapshot for reactive recalc ─────────────────────────────────────────────
+
+def _snapshot_injury_status() -> dict[int, str | None]:
+    """
+    4개 player 테이블에서 (player_id → injury_status) 매핑 한 번에 가져옴.
+
+    Reactive recalc용: fetch 전/후로 두 번 찍어서 비교하면
+    어떤 선수의 injury_status가 진짜로 바뀌었는지 알 수 있음.
+    None (= 부상자 명단에 없음 = 정상) 그대로 저장해서 None ↔ "IL-15" 변화도 잡힘.
+    """
+    db  = SessionLocal()
+    out = {}
+    try:
+        for table in ("batters_al", "batters_nl", "pitchers_al", "pitchers_nl"):
+            rows = db.execute(
+                text(f"SELECT player_id, injury_status FROM {table}")
+            ).fetchall()
+            for r in rows:
+                out[r._mapping["player_id"]] = r._mapping["injury_status"]
+    finally:
+        db.close()
+    return out
+
+
 # ── Update ────────────────────────────────────────────────────────────────────
 
 def _reset_injury_status() -> None:
@@ -209,6 +233,12 @@ def fetch_and_update() -> None:
     """
     Fetch injury data (API-first, HTML fallback) and update batter and pitcher tables.
     Called by daily_update.py as Step 1 of the daily pipeline.
+
+    Reactive recalc 통합 (2026-05):
+      fetch 전/후로 injury_status snapshot을 떠서 비교 →
+      진짜 바뀐 선수만 player_value 즉시 재계산.
+      → bid 정확도가 다음 3시 full recalc까지 stale하지 않고
+        30분 fetch cycle 내에 회복됨.
     """
     # 1st attempt: JSON API
     try:
@@ -229,6 +259,11 @@ def fetch_and_update() -> None:
         logger.error("[injury] No data retrieved — skipping update")
         return
 
+    # ── Reactive recalc 준비 ──
+    # update 전에 옛 injury_status snapshot. 나중에 새 snapshot과 비교해
+    # 진짜 변경된 player_id만 추출.
+    old_status_by_pid = _snapshot_injury_status()
+
     # Clear yesterday's injury data before writing today's
     _reset_injury_status()
 
@@ -237,6 +272,20 @@ def fetch_and_update() -> None:
         f"[injury] source={source} | fetched={len(rows)} "
         f"| matched={matched} | unmatched={unmatched}"
     )
+
+    # ── Reactive recalc 실행 ──
+    # 새 snapshot 뜨고 old vs new 비교 → 바뀐 player_id만 player_value 재계산.
+    # 보통 사이클당 0~5명. recalculate_players는 실패해도 throw 안 함 (안전).
+    new_status_by_pid = _snapshot_injury_status()
+    changed_ids = [
+        pid for pid, new_st in new_status_by_pid.items()
+        if old_status_by_pid.get(pid) != new_st
+    ]
+    if changed_ids:
+        # lazy import — 모듈 로딩 시점 순환 의존 회피
+        from data.pipeline.recalc import recalculate_players
+        logger.info(f"[injury] {len(changed_ids)} player(s) injury changed — triggering reactive recalc")
+        recalculate_players(changed_ids)
 
 
 if __name__ == "__main__":
