@@ -1,0 +1,57 @@
+# Single compose file for both local dev and prod orchestration.
+# Local dev: `docker compose up --build`  (also picks up docker-compose.override.yml for hot reload)
+# Prod    : `docker compose up -d`        (no override file present on the server)
+#
+# Both services share the same MySQL container (different DBs can be created if needed).
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ppa_dun_api}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: us-east1-docker.pkg.dev/v1-mvp/be-api/backend:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: us-east1-docker.pkg.dev/v1-mvp/api/api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+volumes:
+  mysql-data:
