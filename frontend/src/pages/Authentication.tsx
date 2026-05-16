@@ -51,7 +51,27 @@ function Authentication() {
   // copied tracks which key was just copied to clipboard for the 2-second
   // "Copied!" feedback state. Stores the key string, or null if none.
   const [copied, setCopied]   = useState<string | null>(null);
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+
+  // showRegenerateModal controls the visibility of the confirmation modal
+  // that appears before executing a one-click key regeneration.
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+
+  // pendingDeleteKey stores the key string targeted for deletion.
+  // null means the delete modal is closed; a key string opens it.
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+
+  // revealedKeys tracks which keys are currently unmasked.
+  // By default all keys are masked; clicking "Show" adds the key to this set.
+  const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
+
+  // toggleReveal shows or hides the actual key value for a given key string.
+  const toggleReveal = (key: string) => {
+    setRevealedKeys((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
 
   // ── Sync auth state to sessionStorage ────────────────────────────────────
   // Runs whenever user or token changes.
@@ -173,15 +193,6 @@ function Authentication() {
     }
   };
 
-  // ── toggleKeyVisibility ───────────────────────────────────────────────────────
-  const toggleKeyVisibility = (key: string) => {
-  setVisibleKeys((prev) => {
-    const next = new Set(prev);
-    next.has(key) ? next.delete(key) : next.add(key);
-    return next;
-  });
-};
-
   // ── copyToClipboard ───────────────────────────────────────────────────────
   // Copies the key string to the system clipboard and shows a "Copied!" label
   // for 2 seconds before reverting back to "Copy".
@@ -192,15 +203,22 @@ function Authentication() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  // ── handleLogout ──────────────────────────────────────────────────────────
-  // Clears all auth state and returns to the login screen.
-  // sessionStorage cleanup is handled automatically by the useEffect that
-  // watches user and token — setting both to null/"" triggers removeItem.
+  // ── regenerateApiKey ──────────────────────────────────────────────────────
+  // Deletes the existing API key and immediately issues a new one.
+  // Called only after the user confirms the action in the confirmation modal.
+  // Sequence: delete existing key → create new key → close modal.
 
-  const handleLogout = () => {
-    setUser(null);
-    setToken("");
-    setApiKeys([]);
+  const regenerateApiKey = async () => {
+    if (apiKeys.length === 0) return;  // Guard: nothing to regenerate
+    setError("");
+    try {
+      await deleteApiKey(apiKeys[0].key);
+      await createApiKey();
+    } catch {
+      setError("Failed to regenerate API key");
+    } finally {
+      setShowRegenerateModal(false);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -238,34 +256,43 @@ function Authentication() {
           /* ── Logged-in state ─────────────────────────────────────────── */
           <div className="space-y-6">
 
-            {/* User info card */}
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold text-white/40 uppercase">Signed in as</p>
-                <button
-                  onClick={handleLogout}
-                  className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
-                >
-                  Logout
-                </button>
+            {/* Account information card */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-3">
+              <p className="text-xs font-bold text-white/40 uppercase mb-2">Account</p>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-white/40 w-12">Name</span>
+                <span className="text-sm text-white font-semibold">{user.name}</span>
               </div>
-              <p className="text-white font-bold">{user.name}</p>
-              <p className="text-sm text-white/50">{user.email}</p>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-white/40 w-12">Email</span>
+                <span className="text-sm text-white/70">{user.email}</span>
+              </div>
             </div>
 
             {/* API key management card */}
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-white/40 uppercase">Your API Keys</p>
-                {/* Disabled when the user already has a key — enforces 1-key-per-user
-                    client-side. The backend also enforces this with a 400 error. */}
-                <button
-                  onClick={createApiKey}
-                  disabled={apiKeys.length >= 1}
-                  className="rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-black hover:bg-white/90 transition"
-                >
-                  Generate New Key
-                </button>
+                <div className="flex gap-2">
+                  {/* Disabled when the user already has a key — enforces 1-key-per-user
+                      client-side. The backend also enforces this with a 400 error. */}
+                  <button
+                    onClick={createApiKey}
+                    disabled={apiKeys.length >= 1}
+                    className="rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-black hover:bg-white/90 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    Generate New Key
+                  </button>
+                  {/* Regenerate button: only active when a key already exists.
+                      Opens a confirmation modal before executing delete + create. */}
+                  <button
+                    onClick={() => setShowRegenerateModal(true)}
+                    disabled={apiKeys.length === 0}
+                    className="rounded-lg bg-yellow-500/20 px-4 py-1.5 text-xs font-bold text-yellow-400 hover:bg-yellow-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    Regenerate
+                  </button>
+                </div>
               </div>
 
               {error && <p className="text-sm text-red-400">{error}</p>}
@@ -279,28 +306,29 @@ function Authentication() {
                       key={k.key}
                       className="rounded-2xl border border-white/10 bg-black/40 p-4 flex items-center justify-between gap-4"
                     >
-                      {/* Key value — masked by default; revealed when key is in visibleKeys */}
-                      <code className="text-sm text-white/80 truncate">
-                        {visibleKeys.has(k.key) ? k.key : "••••••••••••••••••••••••••••••••"}
+                      {/* Key value — masked by default, revealed on toggle.
+                          break-all ensures long keys wrap instead of overflow. */}
+                      <code className="text-sm text-white/80 break-all">
+                        {revealedKeys.has(k.key) ? k.key : "•".repeat(32)}
                       </code>
-                      <div className="flex gap-2 shrink-0">
-                        {/* Show/Hide toggle button */}
+                      <div className="flex flex-col gap-2 shrink-0">
+                        {/* Show/Hide button: toggles key visibility */}
                         <button
-                          onClick={() => toggleKeyVisibility(k.key)}
+                          onClick={() => toggleReveal(k.key)}
                           className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
                         >
-                          {visibleKeys.has(k.key) ? "Hide" : "Show"}
+                          {revealedKeys.has(k.key) ? "Hide" : "Show"}
                         </button>
-                        {/* Copy button: always copies the full key regardless of display state */}
+                        {/* Copy button: shows "Copied!" for 2s after click */}
                         <button
                           onClick={() => copyToClipboard(k.key)}
                           className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
                         >
                           {copied === k.key ? "Copied!" : "Copy"}
                         </button>
-                        {/* Delete button: calls backend and refreshes key list on success */}
+                        {/* Delete button: opens confirmation modal before deleting */}
                         <button
-                          onClick={() => deleteApiKey(k.key)}
+                          onClick={() => setPendingDeleteKey(k.key)}
                           className="rounded-lg bg-red-500/20 px-3 py-1 text-xs text-red-400 hover:bg-red-500/30 transition"
                         >
                           Delete
@@ -312,31 +340,69 @@ function Authentication() {
               )}
             </div>
 
-            {/* Usage example card — static code snippets showing how to use the key */}
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
-              <p className="text-xs font-bold text-white/40 uppercase mb-2">How to use</p>
-              {/* Header format */}
-              <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80 whitespace-pre-wrap break-all">
-                X-API-Key: your_api_key_here
-              </pre>
-              {/* Full curl example for POST /player/value */}
-              <pre className="rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/80 whitespace-pre-wrap break-all">
-{`curl -X POST https://api.ppa-dun.site/player/value \\
-  -H "Content-Type: application/json" \\
-  -H "X-API-Key: your_api_key_here" \\
-  -d '{
-    "player_name": "Shohei Ohtani",
-    "player_type": "batter",
-    "position": "DH",
-    "stats": {"AB": 536, "R": 102, "HR": 44, "RBI": 96, "SB": 20, "CS": 6, "AVG": 0.310},
-    "league_context": {"league_size": 12, "roster_size": 23, "total_budget": 260}
-  }'`}
-              </pre>
-            </div>
-
           </div>
         )}
       </div>
+
+      {/* ── Delete confirmation modal ─────────────────────────────────────── */}
+      {pendingDeleteKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="rounded-3xl border border-white/10 bg-[#111] p-8 max-w-sm w-full mx-4 space-y-4">
+            <p className="text-white font-bold text-lg">Delete API Key?</p>
+            <p className="text-sm text-white/50">
+              This API key will be permanently deleted.
+              Any services using this key will stop working immediately.
+            </p>
+            <div className="flex gap-3 pt-2">
+              {/* Cancel: close the modal without any changes */}
+              <button
+                onClick={() => setPendingDeleteKey(null)}
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 hover:bg-white/10 transition"
+              >
+                Cancel
+              </button>
+              {/* Confirm: execute delete */}
+              <button
+                onClick={() => { deleteApiKey(pendingDeleteKey); setPendingDeleteKey(null); }}
+                className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-bold text-white hover:bg-red-400 transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Regenerate confirmation modal ──────────────────────────────────── */}
+      {/* Rendered outside the main card flow so it overlays the entire page.  */}
+      {/* Visible only when showRegenerateModal is true.                        */}
+      {showRegenerateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="rounded-3xl border border-white/10 bg-[#111] p-8 max-w-sm w-full mx-4 space-y-4">
+            <p className="text-white font-bold text-lg">Regenerate API Key?</p>
+            <p className="text-sm text-white/50">
+              Your current API key will be permanently deleted and a new one will be issued.
+              Any services using the old key will stop working immediately.
+            </p>
+            <div className="flex gap-3 pt-2">
+              {/* Cancel: close the modal without any changes */}
+              <button
+                onClick={() => setShowRegenerateModal(false)}
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 hover:bg-white/10 transition"
+              >
+                Cancel
+              </button>
+              {/* Confirm: execute delete → create sequence */}
+              <button
+                onClick={regenerateApiKey}
+                className="flex-1 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-black hover:bg-yellow-400 transition"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
