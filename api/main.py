@@ -1,4 +1,3 @@
-# Player valuation API service entry point.
 import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -13,6 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from api.routers import player, players_data
 from api.services.player import compute_player_value, compute_recommended_bid, reload_baselines
 from api.models.player import PlayerValueRequest, PlayerBidRequest
+from api.routers.ip_whitelist import check_ip_whitelist
 from pydantic import BaseModel
 
 import logging
@@ -146,6 +146,14 @@ async def verify_api_key(request: Request, call_next):
             text("SELECT id FROM api_keys WHERE `key` = :key"),  # :key is a parameter placeholder to prevent SQL injection
             {"key": api_key}
         ).fetchone()
+
+        # IP whitelist check — runs only when the key is valid
+        if result is not None:
+            request_ip = get_real_ip(request)
+            ip_allowed = check_ip_whitelist(api_key, request_ip, db)
+        else:
+            ip_allowed = True   # key invalid — 401 will be returned below
+
         db.close()
     except Exception:
         return JSONResponse(
@@ -160,7 +168,14 @@ async def verify_api_key(request: Request, call_next):
             content={"detail": "Invalid API key"}
         )
 
-    # Key is valid
+    # IP not in the user's whitelist
+    if not ip_allowed:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Request IP is not in the allowed IP list for this API key"}
+        )
+
+    # Key is valid and IP is permitted
     return await call_next(request)
 
 # ── Exception Handlers ────────────────────────────────────────────────────────

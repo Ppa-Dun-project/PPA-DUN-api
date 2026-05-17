@@ -22,6 +22,10 @@ class User(Base):
     # back_populates="user" links this side to APIKey.user on the other side.
     api_keys = relationship("APIKey", back_populates="user")
 
+    # One-to-one relationship with UserAllowedIP.
+    # Each user may register at most one allowed IP address for API access.
+    allowed_ip = relationship("UserAllowedIP", back_populates="user", uselist=False)
+
 
 # ── APIKey ────────────────────────────────────────────────────────────────────
 # Represents an API key issued to a user for authenticating requests to the
@@ -45,6 +49,33 @@ class APIKey(Base):
     # Many-to-one relationship back to User.
     # Accessing api_key.user returns the User object that owns this key.
     user = relationship("User", back_populates="api_keys")
+
+
+# ── UserAllowedIP ─────────────────────────────────────────────────────────────
+# Stores the single allowed IP address registered per user account.
+# When a user registers an IP, all API requests using their key must originate
+# from that address. If no record exists, all IPs are permitted.
+#
+# user_id is unique — one row per user, enforced at both DB and application level.
+# ip_address uses String(45) to accommodate both IPv4 and IPv6 addresses.
+# updated_at is set manually on every insert or update.
+
+class UserAllowedIP(Base):
+    __tablename__ = "user_allowed_ips"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+        unique=True,    # Enforces one IP registration per user at the DB level
+    )
+    ip_address = Column(String(45), nullable=False)   # String(45) covers IPv4 and IPv6
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    # Many-to-one relationship back to User.
+    user = relationship("User", back_populates="allowed_ip")
+
 
 # ── BatterBase ────────────────────────────────────────────────────────────────
 # Abstract mixin that defines the shared schema for ALBatter and NLBatter.
