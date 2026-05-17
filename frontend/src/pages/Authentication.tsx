@@ -25,6 +25,7 @@ interface User {
 //   2. Fetch keys    → GET  /api/auth/api-keys  → lists existing keys
 //   3. Generate key  → POST /api/auth/api-key   → issues a new key
 //   4. Delete key    → DELETE /api/auth/api-key/{key}
+//   5. IP whitelist  → POST/GET/DELETE /api/auth/allowed-ip
 //
 // Auth state (user + token) is persisted in sessionStorage so it survives
 // page refreshes within the same browser tab, but is cleared when the tab closes.
@@ -50,7 +51,7 @@ function Authentication() {
 
   // copied tracks which key was just copied to clipboard for the 2-second
   // "Copied!" feedback state. Stores the key string, or null if none.
-  const [copied, setCopied]   = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   // showRegenerateModal controls the visibility of the confirmation modal
   // that appears before executing a one-click key regeneration.
@@ -73,6 +74,15 @@ function Authentication() {
     });
   };
 
+  // allowedIp: the IP address currently registered for this user (null = none registered).
+  // ipInput: the value of the IP input field (controlled).
+  // justGeneratedKey: true immediately after a key is generated to show the IP registration prompt.
+  const [allowedIp,        setAllowedIp]        = useState<string | null>(null);
+  const [ipInput,          setIpInput]          = useState("");
+  const [ipError,          setIpError]          = useState("");
+  const [ipSuccess,        setIpSuccess]        = useState("");
+  const [justGeneratedKey, setJustGeneratedKey] = useState(false);
+
   // ── Sync auth state to sessionStorage ────────────────────────────────────
   // Runs whenever user or token changes.
   // If both are set → persist to sessionStorage and fetch the key list.
@@ -83,6 +93,7 @@ function Authentication() {
       sessionStorage.setItem("user",  JSON.stringify(user));
       sessionStorage.setItem("token", token);
       fetchApiKeys(token);
+      fetchAllowedIp(token);
     } else {
       sessionStorage.removeItem("user");
       sessionStorage.removeItem("token");
@@ -166,6 +177,8 @@ function Authentication() {
 
       // Refresh the key list to show the newly created key
       await fetchApiKeys(token);
+      // Show the "please register your IP" prompt after key generation
+      setJustGeneratedKey(true);
     } catch {
       setError("Failed to create API key");
     }
@@ -214,10 +227,90 @@ function Authentication() {
     try {
       await deleteApiKey(apiKeys[0].key);
       await createApiKey();
+      // Show IP registration prompt only if no IP is registered yet.
+      // Users who already have an IP registered do not need the reminder.
+      if (allowedIp !== null) {
+        setJustGeneratedKey(false);
+      }
     } catch {
       setError("Failed to regenerate API key");
     } finally {
       setShowRegenerateModal(false);
+    }
+  };
+
+  // ── fetchAllowedIp ────────────────────────────────────────────────────────
+  // Fetches the currently registered allowed IP for the logged-in user.
+  // Sets allowedIp to null if none is registered (404 is expected, not an error).
+
+  const fetchAllowedIp = async (googleToken: string) => {
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/api/auth/allowed-ip?google_token=${googleToken}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setAllowedIp(data.ip_address);
+        setIpInput(data.ip_address);
+      } else {
+        // 404 means no IP registered yet — this is the normal initial state
+        setAllowedIp(null);
+        setIpInput("");
+      }
+    } catch {
+      setAllowedIp(null);
+    }
+  };
+
+  // ── saveAllowedIp ─────────────────────────────────────────────────────────
+  // Registers or updates the allowed IP address via POST /api/auth/allowed-ip.
+  // The backend performs an upsert — calling this multiple times is safe.
+
+  const saveAllowedIp = async () => {
+    setIpError("");
+    setIpSuccess("");
+    if (!ipInput.trim()) {
+      setIpError("Please enter an IP address.");
+      return;
+    }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/auth/allowed-ip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, ip_address: ipInput.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setIpError(err.detail || "Failed to save IP address.");
+        return;
+      }
+      const data = await res.json();
+      setAllowedIp(data.ip_address);
+      setIpSuccess("Allowed IP saved successfully.");
+      setJustGeneratedKey(false);
+    } catch {
+      setIpError("Failed to connect to server.");
+    }
+  };
+
+  // ── deleteAllowedIp ───────────────────────────────────────────────────────
+  // Removes the registered allowed IP, restoring access from any IP.
+
+  const deleteAllowedIp = async () => {
+    setIpError("");
+    setIpSuccess("");
+    try {
+      const res = await fetch(
+        `${BACKEND_URL}/api/auth/allowed-ip?google_token=${token}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setAllowedIp(null);
+        setIpInput("");
+        setIpSuccess("Allowed IP removed. Requests from any IP are now accepted.");
+      }
+    } catch {
+      setIpError("Failed to remove IP address.");
     }
   };
 
@@ -268,6 +361,20 @@ function Authentication() {
                 <span className="text-sm text-white/70">{user.email}</span>
               </div>
             </div>
+
+            {/* IP registration prompt banner — shown immediately after key generation */}
+            {justGeneratedKey && (
+              <div className="rounded-2xl border border-yellow-400/30 bg-yellow-400/10 p-4 flex items-start gap-3">
+                <span className="text-yellow-400 text-lg mt-0.5">⚠</span>
+                <div>
+                  <p className="text-sm font-bold text-yellow-300">Register your allowed IP address</p>
+                  <p className="text-xs text-yellow-200/70 mt-1">
+                    Your API key has been generated. For security, scroll down to register
+                    the IP address from which you will make API requests.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* API key management card */}
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
@@ -338,6 +445,51 @@ function Authentication() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* IP Whitelist card */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
+              <p className="text-xs font-bold text-white/40 uppercase">IP Whitelist</p>
+              <p className="text-sm text-white/50">
+                Restrict API access to a single trusted IP address. If no IP is registered,
+                requests from any IP are accepted.
+              </p>
+
+              {/* Current registered IP display */}
+              {allowedIp && (
+                <div className="rounded-2xl border border-white/10 bg-black/40 p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs text-white/40 mb-1">Registered IP</p>
+                    <code className="text-sm text-white/80">{allowedIp}</code>
+                  </div>
+                  <button
+                    onClick={deleteAllowedIp}
+                    className="rounded-lg bg-red-500/20 px-3 py-1 text-xs text-red-400 hover:bg-red-500/30 transition shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {/* IP input + save */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={ipInput}
+                  onChange={(e) => setIpInput(e.target.value)}
+                  placeholder={allowedIp ? "Enter new IP to update" : "e.g. 203.0.113.42"}
+                  className="flex-1 rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                />
+                <button
+                  onClick={saveAllowedIp}
+                  className="rounded-lg bg-white px-4 py-2 text-xs font-bold text-black hover:bg-white/90 transition shrink-0"
+                >
+                  {allowedIp ? "Update" : "Register"}
+                </button>
+              </div>
+
+              {ipError   && <p className="text-sm text-red-400">{ipError}</p>}
+              {ipSuccess && <p className="text-sm text-green-400">{ipSuccess}</p>}
             </div>
 
           </div>

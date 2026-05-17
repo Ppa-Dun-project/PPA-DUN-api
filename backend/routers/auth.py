@@ -1,12 +1,13 @@
 import os
 import secrets
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from pydantic import BaseModel, ConfigDict
 from db.session import get_db
-from db.models import User, APIKey
+from db.models import User, APIKey, UserAllowedIP
 
 # All routes in this router are prefixed with /api/auth.
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -37,6 +38,17 @@ class UserResponse(BaseModel):
 class APIKeyResponse(BaseModel):
     key:        str
     created_at: str
+
+
+class AllowedIPRequest(BaseModel):
+    # Carries both the Google ID token (for auth) and the IP address to register.
+    token:      str
+    ip_address: str
+
+
+class AllowedIPResponse(BaseModel):
+    ip_address: str
+    updated_at: str
 
 
 # ── Helper: verify Google token ───────────────────────────────────────────────
@@ -169,3 +181,87 @@ def delete_api_key(key: str, google_token: str, db: Session = Depends(get_db)):
     db.delete(api_key)
     db.commit()
     return {"detail": "API key deleted"}
+
+
+# ── POST /api/auth/allowed-ip ─────────────────────────────────────────────────
+
+@router.post("/allowed-ip", response_model=AllowedIPResponse)
+def upsert_allowed_ip(req: AllowedIPRequest, db: Session = Depends(get_db)):
+    """
+    Register or update the allowed IP address for the authenticated user.
+    Each account is limited to one allowed IP. Calling this endpoint again
+    overwrites the previously registered address (upsert pattern).
+    """
+    idinfo = _verify_google_token(req.token)
+
+    user = db.query(User).filter(User.google_id == idinfo["sub"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing = db.query(UserAllowedIP).filter(UserAllowedIP.user_id == user.id).first()
+
+    if existing:
+        # Update the existing record
+        existing.ip_address = req.ip_address
+        existing.updated_at = datetime.utcnow()
+    else:
+        # Insert a new record
+        existing = UserAllowedIP(user_id=user.id, ip_address=req.ip_address)
+        db.add(existing)
+
+    db.commit()
+    db.refresh(existing)
+
+    return AllowedIPResponse(
+        ip_address=existing.ip_address,
+        updated_at=str(existing.updated_at),
+    )
+
+
+# ── GET /api/auth/allowed-ip ──────────────────────────────────────────────────
+
+@router.get("/allowed-ip")
+def get_allowed_ip(google_token: str, db: Session = Depends(get_db)):
+    """
+    Return the registered allowed IP address for the authenticated user.
+    Returns 404 if no IP has been registered yet.
+    google_token is passed as a query parameter (?google_token=...).
+    """
+    idinfo = _verify_google_token(google_token)
+
+    user = db.query(User).filter(User.google_id == idinfo["sub"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    record = db.query(UserAllowedIP).filter(UserAllowedIP.user_id == user.id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="No allowed IP registered")
+
+    return AllowedIPResponse(
+        ip_address=record.ip_address,
+        updated_at=str(record.updated_at),
+    )
+
+
+# ── DELETE /api/auth/allowed-ip ───────────────────────────────────────────────
+
+@router.delete("/allowed-ip")
+def delete_allowed_ip(google_token: str, db: Session = Depends(get_db)):
+    """
+    Remove the registered allowed IP address for the authenticated user.
+    After deletion, API requests from any IP are accepted again.
+    google_token is passed as a query parameter (?google_token=...).
+    """
+    idinfo = _verify_google_token(google_token)
+
+    user = db.query(User).filter(User.google_id == idinfo["sub"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    record = db.query(UserAllowedIP).filter(UserAllowedIP.user_id == user.id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="No allowed IP registered")
+
+    db.delete(record)
+    db.commit()
+    return {"detail": "Allowed IP removed"}
