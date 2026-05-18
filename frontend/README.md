@@ -1,5 +1,7 @@
 # React + TypeScript + Vite
 
+<!-- noop touch: triggers deploy-frontend so the new pytest gate runs end-to-end once; PR #141 -->
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
