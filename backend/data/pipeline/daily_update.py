@@ -324,6 +324,62 @@ def _external_fetch_cycle() -> None:
     logger.info("=== External fetch cycle finished ===")
 
 
+def _news_fetch_cycle() -> None:
+    """RSS news poll — every 30 min, pull the Yahoo MLB feed and push one
+    notification per newly-seen story to the BE webhook. Bootstrap cycles
+    (empty ledger) record items but do not notify, so a freshly-deployed
+    scheduler does not toast-flood every connected browser with a 20-item
+    backlog.
+
+    Each item is sent through the same `/internal/notify` webhook that
+    injury/depth alerts use. `event_type="NEWS"` lets the FE pick the right
+    prefix/variant; `player_id="MLB_NEWS"` is a placeholder because the BE
+    notification schema requires a non-null player_id (the FE ignores the
+    value for NEWS events).
+    """
+    from data.sources.mlb_news import find_new_items
+
+    logger.info("=== News fetch cycle started ===")
+
+    be_webhook_url = os.getenv("BE_WEBHOOK_URL")
+    internal_key = os.getenv("INTERNAL_WEBHOOK_KEY")
+    if not be_webhook_url or not internal_key:
+        logger.warning("[news_fetch] BE_WEBHOOK_URL or INTERNAL_WEBHOOK_KEY not set — skipping")
+        return
+
+    try:
+        new_items = find_new_items()
+    except Exception as e:
+        logger.error(f"[news_fetch] find_new_items failed: {e}")
+        return
+
+    if not new_items:
+        logger.info("=== News fetch cycle finished (no new items) ===")
+        return
+
+    notified = 0
+    for item in new_items:
+        payload = {
+            "player_id": "MLB_NEWS",
+            "message": item.title,
+            "event_type": "NEWS",
+            "player_name": None,
+        }
+        try:
+            resp = requests.post(
+                be_webhook_url,
+                json=payload,
+                headers={"X-Internal-Key": internal_key},
+                timeout=5,
+            )
+            resp.raise_for_status()
+            notified += 1
+        except requests.RequestException as e:
+            logger.warning(f"[news_fetch] webhook failed for guid={item.guid}: {e}")
+
+    logger.info(f"=== News fetch cycle finished — notified {notified}/{len(new_items)} items ===")
+
+
 def _full_recalc_cycle() -> None:
     """Heavy recalc loop that runs once daily at 3 AM ET — baselines +
     player_value across all ~1300 players. Kept on the original daily cadence
@@ -362,6 +418,14 @@ def start_scheduler():
         id="external_fetch",
         name="External fetch — injuries + depth (every 30 min)",
     )
+    # News poller offset by 5 min so it doesn't fire at the same instant
+    # as the injury/depth fetch (avoids stacked CPU + outbound HTTP bursts).
+    scheduler.add_job(
+        _news_fetch_cycle,
+        trigger=CronTrigger(minute="5,35"),
+        id="news_fetch",
+        name="News fetch — MLB RSS → notifications (every 30 min)",
+    )
     scheduler.add_job(
         _full_recalc_cycle,
         trigger=CronTrigger(hour=3, minute=0, timezone="America/New_York"),
@@ -369,7 +433,10 @@ def start_scheduler():
         name="Full recalc — baselines + player_value (3AM ET daily)",
     )
     scheduler.start()
-    logger.info("Scheduler started — external_fetch every 15 min, full_recalc at 3AM ET")
+    logger.info(
+        "Scheduler started — external_fetch every 30 min, news_fetch every 30 min, "
+        "full_recalc at 3AM ET"
+    )
     return scheduler
 
 
