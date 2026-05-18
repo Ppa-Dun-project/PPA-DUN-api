@@ -10,7 +10,15 @@ env:
   GCP_ZONE: us-east1-b
 
 jobs:
+  test:
+    # Reuses the standalone test workflow — keeps the pytest command in one
+    # place and ensures the deploy can't run unless tests are green. The
+    # frontend currently has no JS test framework, so the Python suite is
+    # the only gate.
+    uses: ./.github/workflows/test.yml
+
   build-and-deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
