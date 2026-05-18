@@ -322,3 +322,18 @@ class APIRequestLog(Base):
     status      = Column(Integer,     nullable=True)               # HTTP response code
     duration_ms = Column(Float,       nullable=True)               # request processing time
     ts          = Column(DateTime,    nullable=False, default=datetime.utcnow, index=True)
+
+
+# ── MLBNewsSeen ───────────────────────────────────────────────────────────────
+# Dedup ledger for the MLB news RSS poller. Each row is one feed item we have
+# already observed and pushed to the BE webhook. Indexed by guid so the 30-min
+# poller can quickly check "have we seen this?" before notifying again.
+# Old rows are pruned by the poller itself (cap at MAX_ROWS) to bound growth.
+
+class MLBNewsSeen(Base):
+    __tablename__ = "mlb_news_seen"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    guid        = Column(String(512), unique=True, nullable=False, index=True)
+    title       = Column(String(512), nullable=True)
+    seen_at     = Column(DateTime,    nullable=False, default=datetime.utcnow)
