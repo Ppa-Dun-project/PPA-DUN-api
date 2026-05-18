@@ -1,11 +1,12 @@
 # Test-only dependencies. Run: pip install -r requirements-test.txt
 #
-# Cascades both service requirements so test_a.py can import from both
-# api.* and backend.* in a single Python process. backend/requirements.txt is
-# listed second so its newer fastapi / sqlalchemy / pydantic pins win during
-# resolution — they're the broader of the two and api still works with them.
--r api/requirements.txt
+# Can't cascade `-r api/requirements.txt -r backend/requirements.txt` because
+# the two files pin fastapi / sqlalchemy / pydantic to incompatible versions.
+# Backend's pins are the newer / broader set and api still works against them,
+# so we cascade only backend and explicitly add any api-only deps used at
+# import time (slowapi is api's rate-limit dependency).
 -r backend/requirements.txt
+slowapi
 
 pytest
 pytest-asyncio
