@@ -36,4 +36,6 @@ jobs:
       - name: Run pytest
         # Only tests/test_a.py is in main; api/tests/ from older commits was
         # removed. test_b.py is end-to-end and excluded (needs docker compose).
-        run: pytest tests/test_a.py -v
+        # `python -m pytest` adds repo root to sys.path so `from api.main import app`
+        # resolves.
+        run: python -m pytest tests/test_a.py -v
