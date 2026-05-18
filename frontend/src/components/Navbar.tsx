@@ -21,9 +21,6 @@ function Navbar() {
         <Link to="/endpoints" className="text-sm text-white/60 hover:text-white transition">
           Endpoints
         </Link>
-        <Link to="/demo" className="text-sm text-white/60 hover:text-white transition">
-          Demo
-        </Link>
         <Link to="/auth" className="text-sm text-white/60 hover:text-white transition">
           Authentication
         </Link>

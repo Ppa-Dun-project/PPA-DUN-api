@@ -2,7 +2,6 @@ import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Hero from "./pages/Hero";
 import Endpoints from "./pages/Endpoints";
-import Demo from "./pages/Demo";
 import Authentication from "./pages/Authentication";
 
 // App is the root component of the dashboard.
@@ -12,7 +11,6 @@ import Authentication from "./pages/Authentication";
 // Route map:
 //   /            → Hero.tsx          Landing page + algorithm explanation
 //   /endpoints   → Endpoints.tsx     API spec documentation
-//   /demo        → Demo.tsx          Interactive API demo (calls /demo/value, /demo/bid)
 //   /auth        → Authentication.tsx Google login + API key management
 
 function App() {
@@ -25,7 +23,6 @@ function App() {
       <Routes>
         <Route path="/"          element={<Hero />} />
         <Route path="/endpoints" element={<Endpoints />} />
-        <Route path="/demo"      element={<Demo />} />
         <Route path="/auth"      element={<Authentication />} />
       </Routes>
     </div>

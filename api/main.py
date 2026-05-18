@@ -11,12 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 from api.routers import player, players_data
-from api.services.player import compute_player_value, compute_recommended_bid, reload_baselines
-from api.models.player import PlayerValueRequest, PlayerBidRequest
+from api.services.player import reload_baselines
 from api.routers.ip_whitelist import check_ip_whitelist
 from pydantic import BaseModel
 
@@ -56,11 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Rate Limiter ──────────────────────────────────────────────────────────────
-# this limiter is used for the /demo/* endpoints later in this file
-
-# get_real_ip() extracts the actual client IP from the X-Forwarded-For header,
-# which nginx sets when proxying requests. Without this, it seems every requests are from nginx container
+# ── Helper ──────────────────────────────────────────────────────────────
 
 def get_real_ip(request: Request) -> str:
     forwarded_for = request.headers.get("X-Forwarded-For")
@@ -72,46 +64,9 @@ def get_real_ip(request: Request) -> str:
     # Fall back to the direct connection IP if the header is absent
     return request.client.host
 
-limiter = Limiter(key_func=get_real_ip)   # setting criteria for rate limiting (by client IP)
-app.state.limiter = limiter         # slowapi reads the limiter from app.state
-app.add_middleware(SlowAPIMiddleware)  # adds the rate limiting middleware to the app
-
-# Custom handler for rate limit exceeded errors.
-async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": "Too many requests. Please wait a moment and try again."},
-    )
-
-app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-
-# ── Demo Origin Restriction ───────────────────────────────────────────────────
-# demo can be used with curl. To prevent abuse, restrict the allowed origins to the official dashboard domain.
-
-DEMO_ALLOWED_ORIGINS = {
-    "https://api.ppa-dun.site",
-}
-
-# Allow an additional local origin during development if LOCAL_API_SERVER_URL
-_local_url = os.getenv("LOCAL_API_SERVER_URL")
-if _local_url:
-    DEMO_ALLOWED_ORIGINS.add(_local_url)
-
-
-def check_demo_origin(request: Request):
-    """Raise 403 if the request's Origin header is not in the allowed set."""
-    origin = request.headers.get("origin")
-    if origin and origin not in DEMO_ALLOWED_ORIGINS:
-        raise HTTPException(
-            status_code=403,
-            detail="Origin not allowed for demo endpoints"
-        )
-
 # ── Auth Middleware ───────────────────────────────────────────────────────────
-# This middleware runs on every incoming HTTP request before it reaches any
-# route handler. It enforces API key authentication for all endpoints except:
+# It enforces API key authentication for all endpoints except:
 #   - GET /health      : public health check
-#   - /demo/*          : demo endpoints (auth-exempt by design)
 #   - OPTIONS requests : CORS preflight requests must pass through
 
 # Internal API key for backend → api server communication (daily_update.py)
@@ -150,7 +105,6 @@ async def verify_api_key(request: Request, call_next):
     # Skip auth for exempt paths
     if (
         request.url.path == "/health"
-        or request.url.path.startswith("/demo")
         or request.url.path.startswith("/internal")   # internal endpoints: no API key required
         or request.url.path == "/docs"               # FastAPI auto-generated Swagger UI
         or request.url.path == "/redoc"              # FastAPI auto-generated ReDoc
@@ -275,33 +229,6 @@ app.include_router(players_data.router)
 def health_check():
     """Public endpoint to verify the server is running. No authentication required."""
     return {"status": "ok"}
-
-# ── Demo Endpoints ────────────────────────────────────────────────────────────
-# demo can be used without an API key
-# to prevent abuse, rate limit is applied and allowed origins are restricted.
-
-@app.post("/demo/value")
-@limiter.limit("10/minute")   # limit to 10 requests per minute per client IP
-def demo_value(request: Request, body: PlayerValueRequest):
-    """
-    Demo version of POST /player/value.
-    Returns player_value (0.0 ~ 100.0) without requiring an API key.
-    Origin is restricted to the official dashboard domain.
-    """
-    check_demo_origin(request)
-    return compute_player_value(body)
-
-
-@app.post("/demo/bid")
-@limiter.limit("10/minute")
-def demo_bid(request: Request, body: PlayerBidRequest):
-    """
-    Demo version of POST /player/bid.
-    Returns player_value + recommended_bid without requiring an API key.
-    Origin is restricted to the official dashboard domain.
-    """
-    check_demo_origin(request)
-    return compute_recommended_bid(body)
 
 # ── Internal Baseline Reload ──────────────────────────────────────────────────
 # Called by backend/data/compute_baselines.py after each daily baseline
