@@ -1,0 +1,41 @@
+name: Test
+
+# Runs unit + integration tests (test_b is end-to-end and needs the full docker
+# compose stack, so it's intentionally excluded from the default CI invocation).
+#
+# Triggers:
+#   - push to main — feedback after merge / direct push.
+#   - pull_request targeting main — gates the merge button when branch
+#     protection is enabled in GitHub Settings.
+#   - workflow_call — exposes this as reusable so deploy-* workflows can
+#     require a green test run before building images.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run pytest
+        # Only tests/test_a.py is in main; api/tests/ from older commits was
+        # removed. test_b.py is end-to-end and excluded (needs docker compose).
+        # `python -m pytest` adds repo root to sys.path so `from api.main import app`
+        # resolves.
+        run: python -m pytest tests/test_a.py -v

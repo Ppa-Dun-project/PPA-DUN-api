@@ -11,7 +11,13 @@ env:
   IMAGE: us-east1-docker.pkg.dev/v1-mvp/be-api/backend
 
 jobs:
+  test:
+    # Reuses the standalone test workflow — keeps the pytest command in one
+    # place and ensures the deploy can't run unless tests are green.
+    uses: ./.github/workflows/test.yml
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
