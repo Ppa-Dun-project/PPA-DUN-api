@@ -67,8 +67,9 @@ function PlayerDataTab() {
         PPA-DUN maintains a database of MLB players for the{" "}
         <span className="text-white/80">2025 season</span>, covering both leagues and all positions.
         Player records are sourced from the{" "}
-        <span className="text-white/80">MLB Stats API</span> and{" "}
-        <span className="text-white/80">Baseball Reference</span>, and are automatically
+        <a href="https://statsapi.mlb.com" target="_blank" rel="noopener noreferrer" className="text-white/80 underline underline-offset-2 hover:text-white transition">MLB Stats API</a> and a{" "}
+        <a href="https://www.baseball-reference.com" target="_blank" rel="noopener noreferrer" className="text-white/80 underline underline-offset-2 hover:text-white transition">Baseball Reference</a>{" "}
+        CSV export, and are automatically
         refreshed every day so that injury status, depth chart position, and{" "}
         <code className="text-white/70">player_value</code> always reflect the latest information.
       </p>
@@ -215,10 +216,26 @@ function PlayerDataTab() {
             </thead>
             <tbody>
               {[
-                { field: "injury_status", freq: "Daily (3 AM ET)", source: "ESPN injury feed" },
-                { field: "depth_order",   freq: "Daily (3 AM ET)", source: "Depth chart feed" },
-                { field: "player_value",  freq: "Daily (3 AM ET)", source: "FVARz algorithm (recomputed after above updates)" },
-                { field: "Season stats",  freq: "Static (season snapshot)", source: "Baseball Reference" },
+                {
+                  field: "injury_status",
+                  freq: "Daily (3 AM ET)",
+                  source: <a href="https://www.espn.com/mlb/injuries" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white/70 transition">ESPN API</a>,
+                },
+                {
+                  field: "depth_order",
+                  freq: "Daily (3 AM ET)",
+                  source: <a href="https://www.espn.com/mlb/injuries" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white/70 transition">ESPN API</a>,
+                },
+                {
+                  field: "player_value",
+                  freq: "Daily (3 AM ET)",
+                  source: "FVARz algorithm (recomputed after above updates)",
+                },
+                {
+                  field: "Season stats",
+                  freq: "Static (season snapshot)",
+                  source: <a href="https://www.baseball-reference.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white/70 transition">Baseball Reference (CSV export)</a>,
+                },
               ].map((row, i, arr) => (
                 <tr key={row.field} className={i !== arr.length - 1 ? "border-b border-white/5" : ""}>
                   <td className="px-4 py-2 font-mono text-white/80 text-xs">{row.field}</td>
@@ -244,12 +261,20 @@ function PlayerDataTab() {
             </thead>
             <tbody>
               {[
-                { src: "MLB Stats API (statsapi.mlb.com)", use: "Player identity, team, league, stable player_id" },
-                { src: "Baseball Reference",               use: "Season stats (batting, pitching)" },
-                { src: "ESPN injury feed",                 use: "injury_status (Day-To-Day, 10-Day IL, 60-Day IL, etc.)" },
-                { src: "Depth chart feed",                 use: "depth_order (1 = starter, 2 = backup, …)" },
+                {
+                  src: <a href="https://statsapi.mlb.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white transition">MLB Stats API (statsapi.mlb.com)</a>,
+                  use: "Player identity, team, league, stable player_id",
+                },
+                {
+                  src: <a href="https://www.baseball-reference.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white transition">Baseball Reference</a>,
+                  use: "Season stats (batting, pitching) — imported via CSV export",
+                },
+                {
+                  src: <a href="https://www.espn.com/mlb/injuries" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white transition">ESPN API (site.api.espn.com)</a>,
+                  use: "injury_status (Day-To-Day, 10-Day IL, 60-Day IL, etc.) · depth_order (1 = starter, 2 = backup, …)",
+                },
               ].map((row, i, arr) => (
-                <tr key={row.src} className={i !== arr.length - 1 ? "border-b border-white/5" : ""}>
+                <tr key={i} className={i !== arr.length - 1 ? "border-b border-white/5" : ""}>
                   <td className="px-4 py-2 text-white/80 text-xs font-bold">{row.src}</td>
                   <td className="px-4 py-2 text-white/50 text-xs">{row.use}</td>
                 </tr>
