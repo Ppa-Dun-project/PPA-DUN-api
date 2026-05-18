@@ -519,6 +519,23 @@ function Authentication() {
               {ipSuccess && <p className="text-sm text-green-400">{ipSuccess}</p>}
             </div>
 
+            {/* ── API Usage dashboard ────────────────────────────────────────── */}
+            {/* Grafana panel embedded as an iframe. The dashboard's $user_id    */}
+            {/* template variable is pinned to the signed-in user, so the        */}
+            {/* signed-in user only sees their own request counts / latency.     */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-4">
+              <p className="text-xs font-bold text-white/40 uppercase">Your API Usage</p>
+              <iframe
+                src={`https://grafana.ppa-dun.site/d/user-api-usage/user-api-usage?orgId=1&kiosk=tv&theme=dark&var-user_id=${user.id}&refresh=30s`}
+                className="w-full rounded-xl"
+                style={{ height: '720px', border: 'none' }}
+                title="API Usage Dashboard"
+              />
+              <p className="text-xs text-white/40">
+                Last 24 hours. Powered by Grafana.
+              </p>
+            </div>
+
           </div>
         )}
       </div>
