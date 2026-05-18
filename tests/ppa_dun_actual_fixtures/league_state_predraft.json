@@ -1,0 +1,541 @@
+{
+  "fixture_name": "predraft",
+  "description": "League state generated from 2026Draft workbook",
+  "league_context": {
+    "league_size": 9,
+    "roster_size": 23,
+    "total_budget": 260
+  },
+  "drafted_players_count": 0,
+  "teams": {
+    "Team A": {
+      "remaining_budget": 182,
+      "active_roster_count": 7,
+      "active_roster": [
+        {
+          "player_name": "D. Baldwin",
+          "position": "C"
+        },
+        {
+          "player_name": "X. Edwards (2/S)",
+          "position": "2B"
+        },
+        {
+          "player_name": "A. Burleson (1/O)",
+          "position": "OF"
+        },
+        {
+          "player_name": "S. Imanaga",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Horton",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Pfaadt",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Misorowski",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Jeferson Quero",
+        "Edwin Arroyo",
+        "Starlyn Caba",
+        "Emil Morales",
+        "Eli Willits",
+        "Kevin Alcantara",
+        "Edwin Florentino",
+        "Robby Snelling"
+      ],
+      "taxi": [
+        "Estuary Ruiz",
+        "Griffin Conine",
+        "Will Benson",
+        "Josia Grey",
+        "Blake Perkins",
+        "Albert Alsoy",
+        "Gavin Stone",
+        "Alex Freeland"
+      ]
+    },
+    "Team B": {
+      "remaining_budget": 149,
+      "active_roster_count": 11,
+      "active_roster": [
+        {
+          "player_name": "F. Alvarez",
+          "position": "C"
+        },
+        {
+          "player_name": "S. Horowitz",
+          "position": "1B"
+        },
+        {
+          "player_name": "R. Mauricio",
+          "position": "3B"
+        },
+        {
+          "player_name": "C.J. Abrams",
+          "position": "SS"
+        },
+        {
+          "player_name": "J. Merrill",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Harris",
+          "position": "OF"
+        },
+        {
+          "player_name": "Joseph Ortiz",
+          "position": "U"
+        },
+        {
+          "player_name": "S. Alcantara",
+          "position": "P"
+        },
+        {
+          "player_name": "M. King",
+          "position": "P"
+        },
+        {
+          "player_name": "S. Strider",
+          "position": "P"
+        },
+        {
+          "player_name": "Y. Yamamoto",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Kody Hoese",
+        "Jesus Made",
+        "Hedbert Perez",
+        "Esmerlyn Valdez",
+        "Moises Ballesteros",
+        "Liam Doyle"
+      ],
+      "taxi": [
+        "Jared Triolo",
+        "Encarnacion",
+        "Phil Maton",
+        "Adrian Morejon",
+        "Pedro Pages",
+        "Chris Paddack",
+        "Tyrone Taylor",
+        "Adrian Del Castillo"
+      ]
+    },
+    "Team C": {
+      "remaining_budget": 177,
+      "active_roster_count": 9,
+      "active_roster": [
+        {
+          "player_name": "H. Goodman",
+          "position": "C"
+        },
+        {
+          "player_name": "G. Moreno",
+          "position": "C"
+        },
+        {
+          "player_name": "B. Turang",
+          "position": "2B"
+        },
+        {
+          "player_name": "T. Turner",
+          "position": "SS"
+        },
+        {
+          "player_name": "C. Carroll",
+          "position": "OF"
+        },
+        {
+          "player_name": "P. Crow-Armstrong",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Walker",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Boyd",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Woodruff",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "James Triantos",
+        "Cam Collier",
+        "Josuar De Jesus Gonzalez",
+        "Luis Pena",
+        "Jefferson Rojas",
+        "Joendry Vargas",
+        "Jett Williams",
+        "Jodue De Paula"
+      ],
+      "taxi": [
+        "Jacob Young",
+        "Nate Lowe",
+        "Hilton Waltrip",
+        "Johan Rojas",
+        "Jose Quintana",
+        "Jake Bowers",
+        "Endy Rodriguez",
+        "Nathan Church"
+      ]
+    },
+    "Team D": {
+      "remaining_budget": 162,
+      "active_roster_count": 7,
+      "active_roster": [
+        {
+          "player_name": "M. Muncy",
+          "position": "3B"
+        },
+        {
+          "player_name": "N. Hoerner",
+          "position": "2B"
+        },
+        {
+          "player_name": "F. Lindor",
+          "position": "SS"
+        },
+        {
+          "player_name": "B. Marsh",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Wood",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Keller",
+          "position": "P"
+        },
+        {
+          "player_name": "R. Iglesias",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Harry Ford",
+        "Cooper Pratt",
+        "Bubba Chandler",
+        "Nolan McLean",
+        "Cam Caminiti"
+      ],
+      "taxi": [
+        "Ha Seong Kim",
+        "Rafael Marchan",
+        "Miguel Andujar",
+        "Dylan Moore",
+        "Jose Alvarado",
+        "Jose Urquidy",
+        "Calvin Faucher",
+        "Jason Adam"
+      ]
+    },
+    "Team E": {
+      "remaining_budget": 92,
+      "active_roster_count": 8,
+      "active_roster": [
+        {
+          "player_name": "G. Perdomo",
+          "position": "SS"
+        },
+        {
+          "player_name": "J. Soto",
+          "position": "OF"
+        },
+        {
+          "player_name": "K. Tucker",
+          "position": "OF"
+        },
+        {
+          "player_name": "K. Schwarber",
+          "position": "U"
+        },
+        {
+          "player_name": "A. Abbott",
+          "position": "P"
+        },
+        {
+          "player_name": "F. Peralta",
+          "position": "P"
+        },
+        {
+          "player_name": "P. Skenes",
+          "position": "P"
+        },
+        {
+          "player_name": "N. Cortes",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Chase Burns",
+        "Andrew Painter",
+        "Rhett Lowder",
+        "Aiva Arquette",
+        "Cristian Hernandez",
+        "Ethan Holliday",
+        "Seaver King",
+        "Ethan Conrad"
+      ],
+      "taxi": [
+        "Gary Sanchez",
+        "Boston Griffin",
+        "Hassel",
+        "Emanuel Valdez",
+        "Mauricio Dubon",
+        "Tim Tawa",
+        "Alex Call",
+        "Troy Johnston"
+      ]
+    },
+    "Team F": {
+      "remaining_budget": 194,
+      "active_roster_count": 9,
+      "active_roster": [
+        {
+          "player_name": "N. Arenado",
+          "position": "3B"
+        },
+        {
+          "player_name": "S. Frelick",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Chourio",
+          "position": "OF"
+        },
+        {
+          "player_name": "F. Crews",
+          "position": "OF"
+        },
+        {
+          "player_name": "R. Lopez",
+          "position": "P"
+        },
+        {
+          "player_name": "M. McGreevy",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Sale",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Taillon",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Singer",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Joe Mack",
+        "Ryan Clifford",
+        "Roki Sasaki",
+        "Logan Henderson",
+        "Jonah Tong",
+        "Thomas White"
+      ],
+      "taxi": [
+        "Garcia",
+        "Javier Sonova",
+        "Hae Seong Kim",
+        "Kyle Leahy",
+        "Eli White",
+        "Justin Robleski",
+        "Jose Fernandez",
+        "Santiago Espinal"
+      ]
+    },
+    "Team G": {
+      "remaining_budget": 198,
+      "active_roster_count": 8,
+      "active_roster": [
+        {
+          "player_name": "M. Busch",
+          "position": "1B"
+        },
+        {
+          "player_name": "Austin Riley",
+          "position": "3B"
+        },
+        {
+          "player_name": "P. Smith (1B)",
+          "position": "CI"
+        },
+        {
+          "player_name": "M. Winn",
+          "position": "SS"
+        },
+        {
+          "player_name": "R. Acuna",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Yastremski",
+          "position": "OF"
+        },
+        {
+          "player_name": "N. Lodolo",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Luzardo",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Dalton Rushing",
+        "Sal Stewart",
+        "Justin Crawford",
+        "Termarr Johnson",
+        "Steele Hall",
+        "Aidan Miller",
+        "A.J. Ewing",
+        "Tink Hence"
+      ],
+      "taxi": [
+        "Ivan Herrera",
+        "Romero",
+        "Braxton Garrett",
+        "Keybron Hayes",
+        "Brad Lord",
+        "Seth Halvorsen",
+        "Ramon Urias",
+        "Curtis Mead"
+      ]
+    },
+    "Team H": {
+      "remaining_budget": 166,
+      "active_roster_count": 7,
+      "active_roster": [
+        {
+          "player_name": "C. Kelly",
+          "position": "C"
+        },
+        {
+          "player_name": "F. Freeman",
+          "position": "1B"
+        },
+        {
+          "player_name": "E. De La Cruz",
+          "position": "SS"
+        },
+        {
+          "player_name": "D. Swanson (SS)",
+          "position": "MI"
+        },
+        {
+          "player_name": "J. Hoo Lee",
+          "position": "OF"
+        },
+        {
+          "player_name": "C. Cavalli",
+          "position": "P"
+        },
+        {
+          "player_name": "L. Webb",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Owen Caissie",
+        "Delvin Perez",
+        "Ed Howard",
+        "Hunter Bishop",
+        "Drew Gilbert",
+        "Hudson Head",
+        "Mike Sirota",
+        "Ryan Waldschmidt"
+      ],
+      "taxi": [
+        "Luis Rianfro",
+        "Nunez",
+        "Victor Zodnik",
+        "Christopher Morell",
+        "Justin Steele",
+        "Paul Sewald",
+        "Jorbit Vivas",
+        "Edmundo Sosa"
+      ]
+    },
+    "Team I": {
+      "remaining_budget": 104,
+      "active_roster_count": 10,
+      "active_roster": [
+        {
+          "player_name": "A. Ramirez",
+          "position": "C"
+        },
+        {
+          "player_name": "M. Machado",
+          "position": "3B"
+        },
+        {
+          "player_name": "W. Adames",
+          "position": "SS"
+        },
+        {
+          "player_name": "V. Scott II",
+          "position": "OF"
+        },
+        {
+          "player_name": "S. Suzuki",
+          "position": "OF"
+        },
+        {
+          "player_name": "G. Holmes",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Sanchez",
+          "position": "P"
+        },
+        {
+          "player_name": "N. Pivetta",
+          "position": "P"
+        },
+        {
+          "player_name": "R. Ray",
+          "position": "P"
+        },
+        {
+          "player_name": "S. Ohtani",
+          "position": "P"
+        }
+      ],
+      "minors": [
+        "Seth Hernandez",
+        "Konnor Griffin",
+        "Ethan Salas",
+        "Rainiel Rodriguez",
+        "Alfredo Duno"
+      ],
+      "taxi": [
+        "Tyler Fitzgerald",
+        "Adrian Hauser",
+        "Jose Trevino",
+        "Landen Roupp",
+        "Colin Rea",
+        "Casey Schmidt",
+        "Luken Baker",
+        "Dylan Lee"
+      ]
+    }
+  },
+  "applied_draft_picks": []
+}

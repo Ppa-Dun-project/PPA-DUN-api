@@ -1,0 +1,860 @@
+{
+  "fixture_name": "after_130_Team_H",
+  "source_workbook": "2026Draft (1).xlsx",
+  "league_context": {
+    "league_size": 9,
+    "roster_size": 23,
+    "total_budget": 260
+  },
+  "draft_context": {
+    "my_remaining_budget": 0,
+    "my_remaining_roster_spots": 0,
+    "drafted_players_count": 130,
+    "my_roster": [
+      {
+        "player_name": "C. Kelly",
+        "position": "C"
+      },
+      {
+        "player_name": "F. Freeman",
+        "position": "1B"
+      },
+      {
+        "player_name": "E. De La Cruz",
+        "position": "SS"
+      },
+      {
+        "player_name": "D. Swanson (SS)",
+        "position": "MI"
+      },
+      {
+        "player_name": "J. Hoo Lee",
+        "position": "OF"
+      },
+      {
+        "player_name": "C. Cavalli",
+        "position": "P"
+      },
+      {
+        "player_name": "L. Webb",
+        "position": "P"
+      },
+      {
+        "player_name": "Fernando Tatis",
+        "position": "OF"
+      },
+      {
+        "player_name": "Bo Bichette",
+        "position": "3B"
+      },
+      {
+        "player_name": "Emmet Sheehan",
+        "position": "P"
+      },
+      {
+        "player_name": "Christian Yelich",
+        "position": "OF"
+      },
+      {
+        "player_name": "Hunter Greene",
+        "position": "P"
+      },
+      {
+        "player_name": "Ryan Reynolds",
+        "position": "OF"
+      },
+      {
+        "player_name": "Heliot Ramos",
+        "position": "OF"
+      },
+      {
+        "player_name": "Brett Baty",
+        "position": "CI"
+      },
+      {
+        "player_name": "Joey Wentz",
+        "position": "P"
+      },
+      {
+        "player_name": "Nolan Gorman",
+        "position": "2B"
+      },
+      {
+        "player_name": "David Peterson",
+        "position": "P"
+      },
+      {
+        "player_name": "Keibert Ruiz",
+        "position": "C"
+      },
+      {
+        "player_name": "Harrison Bader",
+        "position": "U"
+      },
+      {
+        "player_name": "Chad Patrick",
+        "position": "P"
+      },
+      {
+        "player_name": "Alex Vesia",
+        "position": "P"
+      },
+      {
+        "player_name": "Luke Weaver",
+        "position": "P"
+      }
+    ],
+    "opponent_rosters": {
+      "Team A": [
+        {
+          "player_name": "D. Baldwin",
+          "position": "C"
+        },
+        {
+          "player_name": "X. Edwards (2/S)",
+          "position": "2B"
+        },
+        {
+          "player_name": "A. Burleson (1/O)",
+          "position": "OF"
+        },
+        {
+          "player_name": "S. Imanaga",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Horton",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Pfaadt",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Misorowski",
+          "position": "P"
+        },
+        {
+          "player_name": "Otto Lopez",
+          "position": "SS"
+        },
+        {
+          "player_name": "Matt Chapman",
+          "position": "3B"
+        },
+        {
+          "player_name": "Matt Olson",
+          "position": "1B"
+        },
+        {
+          "player_name": "Brandon Lowe",
+          "position": "MI"
+        },
+        {
+          "player_name": "Devin Williams",
+          "position": "P"
+        },
+        {
+          "player_name": "Ian Happ",
+          "position": "OF"
+        },
+        {
+          "player_name": "Teoscar Hernandez",
+          "position": "OF"
+        },
+        {
+          "player_name": "Joe Musgrove",
+          "position": "P"
+        },
+        {
+          "player_name": "Carlos Santana",
+          "position": "CI"
+        },
+        {
+          "player_name": "Noelvi Marte",
+          "position": "OF"
+        },
+        {
+          "player_name": "Tanner Scott",
+          "position": "P"
+        },
+        {
+          "player_name": "Ben Brown",
+          "position": "P"
+        },
+        {
+          "player_name": "Tobias Meyer",
+          "position": "P"
+        },
+        {
+          "player_name": "Gavin Sheets",
+          "position": "OF"
+        },
+        {
+          "player_name": "Luis Torrens",
+          "position": "C"
+        },
+        {
+          "player_name": "Mike Tauchman",
+          "position": "U"
+        }
+      ],
+      "Team B": [
+        {
+          "player_name": "F. Alvarez",
+          "position": "C"
+        },
+        {
+          "player_name": "S. Horowitz",
+          "position": "1B"
+        },
+        {
+          "player_name": "R. Mauricio",
+          "position": "3B"
+        },
+        {
+          "player_name": "C.J. Abrams",
+          "position": "SS"
+        },
+        {
+          "player_name": "J. Merrill",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Harris",
+          "position": "OF"
+        },
+        {
+          "player_name": "Joseph Ortiz",
+          "position": "U"
+        },
+        {
+          "player_name": "S. Alcantara",
+          "position": "P"
+        },
+        {
+          "player_name": "M. King",
+          "position": "P"
+        },
+        {
+          "player_name": "S. Strider",
+          "position": "P"
+        },
+        {
+          "player_name": "Y. Yamamoto",
+          "position": "P"
+        },
+        {
+          "player_name": "Alex Bregman",
+          "position": "CI"
+        },
+        {
+          "player_name": "Mason Miller",
+          "position": "P"
+        },
+        {
+          "player_name": "Luis Garcia",
+          "position": "2B"
+        },
+        {
+          "player_name": "Jhoan Duran",
+          "position": "P"
+        },
+        {
+          "player_name": "Daniel Palencia",
+          "position": "P"
+        },
+        {
+          "player_name": "Edward Cabrera",
+          "position": "P"
+        },
+        {
+          "player_name": "Patrick Bailey",
+          "position": "C"
+        },
+        {
+          "player_name": "Tyler Freeman",
+          "position": "OF"
+        },
+        {
+          "player_name": "Quinn Priester",
+          "position": "P"
+        },
+        {
+          "player_name": "Lourdes Guerriel",
+          "position": "OF"
+        },
+        {
+          "player_name": "Jake Magnum",
+          "position": "OF"
+        },
+        {
+          "player_name": "Mark Vientos",
+          "position": "MI"
+        }
+      ],
+      "Team C": [
+        {
+          "player_name": "H. Goodman",
+          "position": "C"
+        },
+        {
+          "player_name": "G. Moreno",
+          "position": "C"
+        },
+        {
+          "player_name": "B. Turang",
+          "position": "2B"
+        },
+        {
+          "player_name": "T. Turner",
+          "position": "SS"
+        },
+        {
+          "player_name": "C. Carroll",
+          "position": "OF"
+        },
+        {
+          "player_name": "P. Crow-Armstrong",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Walker",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Boyd",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Woodruff",
+          "position": "P"
+        },
+        {
+          "player_name": "Bryce Harper",
+          "position": "1B"
+        },
+        {
+          "player_name": "Blake Snell",
+          "position": "P"
+        },
+        {
+          "player_name": "Kyle Stowers",
+          "position": "OF"
+        },
+        {
+          "player_name": "Tyler Glasnow",
+          "position": "P"
+        },
+        {
+          "player_name": "Edwin Diaz",
+          "position": "P"
+        },
+        {
+          "player_name": "Eury Perez",
+          "position": "P"
+        },
+        {
+          "player_name": "Bryson Stott",
+          "position": "MI"
+        },
+        {
+          "player_name": "Jordan Beck",
+          "position": "OF"
+        },
+        {
+          "player_name": "Willy Castro",
+          "position": "3B"
+        },
+        {
+          "player_name": "Senga",
+          "position": "P"
+        },
+        {
+          "player_name": "Marcell Ozuna",
+          "position": "U"
+        },
+        {
+          "player_name": "Brady House",
+          "position": "CI"
+        },
+        {
+          "player_name": "Corbin Burnes",
+          "position": "P"
+        },
+        {
+          "player_name": "Spencer Shellenbach",
+          "position": "P"
+        }
+      ],
+      "Team D": [
+        {
+          "player_name": "M. Muncy",
+          "position": "3B"
+        },
+        {
+          "player_name": "N. Hoerner",
+          "position": "2B"
+        },
+        {
+          "player_name": "F. Lindor",
+          "position": "SS"
+        },
+        {
+          "player_name": "B. Marsh",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Wood",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Keller",
+          "position": "P"
+        },
+        {
+          "player_name": "R. Iglesias",
+          "position": "P"
+        },
+        {
+          "player_name": "William Contreras",
+          "position": "C"
+        },
+        {
+          "player_name": "Mookie Betts",
+          "position": "MI"
+        },
+        {
+          "player_name": "Will Smith",
+          "position": "C"
+        },
+        {
+          "player_name": "Aaron Nola",
+          "position": "P"
+        },
+        {
+          "player_name": "TJ Friedl",
+          "position": "OF"
+        },
+        {
+          "player_name": "Merrill Kelly",
+          "position": "P"
+        },
+        {
+          "player_name": "Zack Wheeler",
+          "position": "P"
+        },
+        {
+          "player_name": "Luis Arraez",
+          "position": "1B"
+        },
+        {
+          "player_name": "Matt McLain",
+          "position": "U"
+        },
+        {
+          "player_name": "Abner Uribe",
+          "position": "P"
+        },
+        {
+          "player_name": "Ryne Nelson",
+          "position": "P"
+        },
+        {
+          "player_name": "Matt Shaw",
+          "position": "CI"
+        },
+        {
+          "player_name": "Sean Manaea",
+          "position": "P"
+        },
+        {
+          "player_name": "Garrett Mitchell",
+          "position": "OF"
+        },
+        {
+          "player_name": "Lars Nootbaar",
+          "position": "OF"
+        }
+      ],
+      "Team E": [
+        {
+          "player_name": "G. Perdomo",
+          "position": "SS"
+        },
+        {
+          "player_name": "J. Soto",
+          "position": "OF"
+        },
+        {
+          "player_name": "K. Tucker",
+          "position": "OF"
+        },
+        {
+          "player_name": "K. Schwarber",
+          "position": "U"
+        },
+        {
+          "player_name": "A. Abbott",
+          "position": "P"
+        },
+        {
+          "player_name": "F. Peralta",
+          "position": "P"
+        },
+        {
+          "player_name": "P. Skenes",
+          "position": "P"
+        },
+        {
+          "player_name": "N. Cortes",
+          "position": "P"
+        },
+        {
+          "player_name": "Daylen Lile",
+          "position": "OF"
+        },
+        {
+          "player_name": "Xander Boegarts",
+          "position": "MI"
+        },
+        {
+          "player_name": "Miguel Amaya",
+          "position": "C"
+        },
+        {
+          "player_name": "Liam Hicks",
+          "position": "C"
+        },
+        {
+          "player_name": "Emilio Pagan",
+          "position": "P"
+        },
+        {
+          "player_name": "Ryan Walker",
+          "position": "P"
+        },
+        {
+          "player_name": "Adolis Garcia",
+          "position": "OF"
+        },
+        {
+          "player_name": "Andrew Vaughn",
+          "position": "1B"
+        },
+        {
+          "player_name": "Tommy Edman",
+          "position": "2B"
+        },
+        {
+          "player_name": "Conor Norby",
+          "position": "3B"
+        },
+        {
+          "player_name": "Robert Suarez",
+          "position": "P"
+        },
+        {
+          "player_name": "Kyle Karros",
+          "position": "CI"
+        },
+        {
+          "player_name": "Matthew Libartore",
+          "position": "P"
+        },
+        {
+          "player_name": "Jorge Mateo",
+          "position": "OF"
+        }
+      ],
+      "Team F": [
+        {
+          "player_name": "N. Arenado",
+          "position": "3B"
+        },
+        {
+          "player_name": "S. Frelick",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Chourio",
+          "position": "OF"
+        },
+        {
+          "player_name": "F. Crews",
+          "position": "OF"
+        },
+        {
+          "player_name": "R. Lopez",
+          "position": "P"
+        },
+        {
+          "player_name": "M. McGreevy",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Sale",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Taillon",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Singer",
+          "position": "P"
+        },
+        {
+          "player_name": "Ketel Marte",
+          "position": "2B"
+        },
+        {
+          "player_name": "Marcus Semien",
+          "position": "MI"
+        },
+        {
+          "player_name": "Eugenio Suarez",
+          "position": "CI"
+        },
+        {
+          "player_name": "Miguel Rojas",
+          "position": "SS"
+        },
+        {
+          "player_name": "Mickey Moniak",
+          "position": "OF"
+        },
+        {
+          "player_name": "Spencer Steer",
+          "position": "1B"
+        },
+        {
+          "player_name": "JT Realmuto",
+          "position": "C"
+        },
+        {
+          "player_name": "Ryan O'Hearn",
+          "position": "OF"
+        },
+        {
+          "player_name": "Tyler Stephenson",
+          "position": "C"
+        },
+        {
+          "player_name": "Matt Svanson",
+          "position": "P"
+        },
+        {
+          "player_name": "Pete Fairbanks",
+          "position": "P"
+        },
+        {
+          "player_name": "DTeam D Santana",
+          "position": "P"
+        },
+        {
+          "player_name": "Ramon Laureano",
+          "position": "U"
+        },
+        {
+          "player_name": "Kevin Ginkel",
+          "position": "P"
+        }
+      ],
+      "Team G": [
+        {
+          "player_name": "M. Busch",
+          "position": "1B"
+        },
+        {
+          "player_name": "Austin Riley",
+          "position": "3B"
+        },
+        {
+          "player_name": "P. Smith (1B)",
+          "position": "CI"
+        },
+        {
+          "player_name": "M. Winn",
+          "position": "SS"
+        },
+        {
+          "player_name": "R. Acuna",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Yastremski",
+          "position": "OF"
+        },
+        {
+          "player_name": "N. Lodolo",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Luzardo",
+          "position": "P"
+        },
+        {
+          "player_name": "Ozzie Albies",
+          "position": "2B"
+        },
+        {
+          "player_name": "Zac Gallen",
+          "position": "P"
+        },
+        {
+          "player_name": "Rafael Devers",
+          "position": "U"
+        },
+        {
+          "player_name": "Jorge Polanco",
+          "position": "OF"
+        },
+        {
+          "player_name": "Trevor McGill",
+          "position": "P"
+        },
+        {
+          "player_name": "Oneil Cruz",
+          "position": "OF"
+        },
+        {
+          "player_name": "Andy Pages",
+          "position": "OF"
+        },
+        {
+          "player_name": "Eduardo Rodriguez",
+          "position": "P"
+        },
+        {
+          "player_name": "Dustin May",
+          "position": "P"
+        },
+        {
+          "player_name": "Joey Bart",
+          "position": "C"
+        },
+        {
+          "player_name": "Henry Davis",
+          "position": "C"
+        },
+        {
+          "player_name": "Nick Castellanos",
+          "position": "MI"
+        },
+        {
+          "player_name": "Riley O'Brien",
+          "position": "P"
+        },
+        {
+          "player_name": "Clay Holmes",
+          "position": "P"
+        }
+      ],
+      "Team I": [
+        {
+          "player_name": "A. Ramirez",
+          "position": "C"
+        },
+        {
+          "player_name": "M. Machado",
+          "position": "3B"
+        },
+        {
+          "player_name": "W. Adames",
+          "position": "SS"
+        },
+        {
+          "player_name": "V. Scott II",
+          "position": "OF"
+        },
+        {
+          "player_name": "S. Suzuki",
+          "position": "OF"
+        },
+        {
+          "player_name": "G. Holmes",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Sanchez",
+          "position": "P"
+        },
+        {
+          "player_name": "N. Pivetta",
+          "position": "P"
+        },
+        {
+          "player_name": "R. Ray",
+          "position": "P"
+        },
+        {
+          "player_name": "S. Ohtani",
+          "position": "P"
+        },
+        {
+          "player_name": "Ezekiel Tovar",
+          "position": "MI"
+        },
+        {
+          "player_name": "Alex Bohm",
+          "position": "1B"
+        },
+        {
+          "player_name": "Luis Robert",
+          "position": "OF"
+        },
+        {
+          "player_name": "Brenton Doyle",
+          "position": "OF"
+        },
+        {
+          "player_name": "Jakob Marsee",
+          "position": "OF"
+        },
+        {
+          "player_name": "Freddy Fermin",
+          "position": "C"
+        },
+        {
+          "player_name": "Tyler Mahle",
+          "position": "P"
+        },
+        {
+          "player_name": "Jake Cronenworth",
+          "position": "2B"
+        },
+        {
+          "player_name": "TJ Rumfield",
+          "position": "CI"
+        },
+        {
+          "player_name": "Max Meyer",
+          "position": "P"
+        },
+        {
+          "player_name": "Braxton Ashcraft",
+          "position": "P"
+        },
+        {
+          "player_name": "Jake McCarthy",
+          "position": "U"
+        },
+        {
+          "player_name": "Jaxon Wiggins",
+          "position": "P"
+        }
+      ]
+    },
+    "opponent_budgets": {
+      "Team A": 0,
+      "Team B": 0,
+      "Team C": 3,
+      "Team D": 1,
+      "Team E": 3,
+      "Team F": 16,
+      "Team G": 1,
+      "Team I": 1
+    }
+  }
+}

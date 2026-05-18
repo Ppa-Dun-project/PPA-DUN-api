@@ -1,0 +1,348 @@
+{
+  "fixture_name": "predraft_Team_B",
+  "source_workbook": "2026Draft (1).xlsx",
+  "league_context": {
+    "league_size": 9,
+    "roster_size": 23,
+    "total_budget": 260
+  },
+  "draft_context": {
+    "my_remaining_budget": 149,
+    "my_remaining_roster_spots": 12,
+    "drafted_players_count": 0,
+    "my_roster": [
+      {
+        "player_name": "F. Alvarez",
+        "position": "C"
+      },
+      {
+        "player_name": "S. Horowitz",
+        "position": "1B"
+      },
+      {
+        "player_name": "R. Mauricio",
+        "position": "3B"
+      },
+      {
+        "player_name": "C.J. Abrams",
+        "position": "SS"
+      },
+      {
+        "player_name": "J. Merrill",
+        "position": "OF"
+      },
+      {
+        "player_name": "M. Harris",
+        "position": "OF"
+      },
+      {
+        "player_name": "Joseph Ortiz",
+        "position": "U"
+      },
+      {
+        "player_name": "S. Alcantara",
+        "position": "P"
+      },
+      {
+        "player_name": "M. King",
+        "position": "P"
+      },
+      {
+        "player_name": "S. Strider",
+        "position": "P"
+      },
+      {
+        "player_name": "Y. Yamamoto",
+        "position": "P"
+      }
+    ],
+    "opponent_rosters": {
+      "Team A": [
+        {
+          "player_name": "D. Baldwin",
+          "position": "C"
+        },
+        {
+          "player_name": "X. Edwards (2/S)",
+          "position": "2B"
+        },
+        {
+          "player_name": "A. Burleson (1/O)",
+          "position": "OF"
+        },
+        {
+          "player_name": "S. Imanaga",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Horton",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Pfaadt",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Misorowski",
+          "position": "P"
+        }
+      ],
+      "Team C": [
+        {
+          "player_name": "H. Goodman",
+          "position": "C"
+        },
+        {
+          "player_name": "G. Moreno",
+          "position": "C"
+        },
+        {
+          "player_name": "B. Turang",
+          "position": "2B"
+        },
+        {
+          "player_name": "T. Turner",
+          "position": "SS"
+        },
+        {
+          "player_name": "C. Carroll",
+          "position": "OF"
+        },
+        {
+          "player_name": "P. Crow-Armstrong",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Walker",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Boyd",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Woodruff",
+          "position": "P"
+        }
+      ],
+      "Team D": [
+        {
+          "player_name": "M. Muncy",
+          "position": "3B"
+        },
+        {
+          "player_name": "N. Hoerner",
+          "position": "2B"
+        },
+        {
+          "player_name": "F. Lindor",
+          "position": "SS"
+        },
+        {
+          "player_name": "B. Marsh",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Wood",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Keller",
+          "position": "P"
+        },
+        {
+          "player_name": "R. Iglesias",
+          "position": "P"
+        }
+      ],
+      "Team E": [
+        {
+          "player_name": "G. Perdomo",
+          "position": "SS"
+        },
+        {
+          "player_name": "J. Soto",
+          "position": "OF"
+        },
+        {
+          "player_name": "K. Tucker",
+          "position": "OF"
+        },
+        {
+          "player_name": "K. Schwarber",
+          "position": "U"
+        },
+        {
+          "player_name": "A. Abbott",
+          "position": "P"
+        },
+        {
+          "player_name": "F. Peralta",
+          "position": "P"
+        },
+        {
+          "player_name": "P. Skenes",
+          "position": "P"
+        },
+        {
+          "player_name": "N. Cortes",
+          "position": "P"
+        }
+      ],
+      "Team F": [
+        {
+          "player_name": "N. Arenado",
+          "position": "3B"
+        },
+        {
+          "player_name": "S. Frelick",
+          "position": "OF"
+        },
+        {
+          "player_name": "J. Chourio",
+          "position": "OF"
+        },
+        {
+          "player_name": "F. Crews",
+          "position": "OF"
+        },
+        {
+          "player_name": "R. Lopez",
+          "position": "P"
+        },
+        {
+          "player_name": "M. McGreevy",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Sale",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Taillon",
+          "position": "P"
+        },
+        {
+          "player_name": "B. Singer",
+          "position": "P"
+        }
+      ],
+      "Team G": [
+        {
+          "player_name": "M. Busch",
+          "position": "1B"
+        },
+        {
+          "player_name": "Austin Riley",
+          "position": "3B"
+        },
+        {
+          "player_name": "P. Smith (1B)",
+          "position": "CI"
+        },
+        {
+          "player_name": "M. Winn",
+          "position": "SS"
+        },
+        {
+          "player_name": "R. Acuna",
+          "position": "OF"
+        },
+        {
+          "player_name": "M. Yastremski",
+          "position": "OF"
+        },
+        {
+          "player_name": "N. Lodolo",
+          "position": "P"
+        },
+        {
+          "player_name": "J. Luzardo",
+          "position": "P"
+        }
+      ],
+      "Team H": [
+        {
+          "player_name": "C. Kelly",
+          "position": "C"
+        },
+        {
+          "player_name": "F. Freeman",
+          "position": "1B"
+        },
+        {
+          "player_name": "E. De La Cruz",
+          "position": "SS"
+        },
+        {
+          "player_name": "D. Swanson (SS)",
+          "position": "MI"
+        },
+        {
+          "player_name": "J. Hoo Lee",
+          "position": "OF"
+        },
+        {
+          "player_name": "C. Cavalli",
+          "position": "P"
+        },
+        {
+          "player_name": "L. Webb",
+          "position": "P"
+        }
+      ],
+      "Team I": [
+        {
+          "player_name": "A. Ramirez",
+          "position": "C"
+        },
+        {
+          "player_name": "M. Machado",
+          "position": "3B"
+        },
+        {
+          "player_name": "W. Adames",
+          "position": "SS"
+        },
+        {
+          "player_name": "V. Scott II",
+          "position": "OF"
+        },
+        {
+          "player_name": "S. Suzuki",
+          "position": "OF"
+        },
+        {
+          "player_name": "G. Holmes",
+          "position": "P"
+        },
+        {
+          "player_name": "C. Sanchez",
+          "position": "P"
+        },
+        {
+          "player_name": "N. Pivetta",
+          "position": "P"
+        },
+        {
+          "player_name": "R. Ray",
+          "position": "P"
+        },
+        {
+          "player_name": "S. Ohtani",
+          "position": "P"
+        }
+      ]
+    },
+    "opponent_budgets": {
+      "Team A": 182,
+      "Team C": 177,
+      "Team D": 162,
+      "Team E": 92,
+      "Team F": 194,
+      "Team G": 198,
+      "Team H": 166,
+      "Team I": 104
+    }
+  }
+}
