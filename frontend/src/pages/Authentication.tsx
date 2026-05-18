@@ -314,6 +314,24 @@ function Authentication() {
     }
   };
 
+  // ── handleLogout ──────────────────────────────────────────────────────────
+  // Clears all auth state and sessionStorage, returning the page to the login view.
+  // No backend call is needed — Google OAuth tokens are stateless on the client side.
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken("");
+    setApiKeys([]);
+    setAllowedIp(null);
+    setIpInput("");
+    setIpError("");
+    setIpSuccess("");
+    setError("");
+    setJustGeneratedKey(false);
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -351,7 +369,16 @@ function Authentication() {
 
             {/* Account information card */}
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 space-y-3">
-              <p className="text-xs font-bold text-white/40 uppercase mb-2">Account</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-white/40 uppercase">Account</p>
+                {/* Sign Out: clears all local auth state and returns to the login view */}
+                <button
+                  onClick={handleLogout}
+                  className="rounded-lg bg-white/10 px-3 py-1 text-xs text-white/60 hover:bg-white/20 transition"
+                >
+                  Sign Out
+                </button>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-white/40 w-12">Name</span>
                 <span className="text-sm text-white font-semibold">{user.name}</span>
