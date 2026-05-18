@@ -2,6 +2,7 @@
 
 import os
 import time
+from collections import deque
 from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -116,6 +117,33 @@ def check_demo_origin(request: Request):
 # Internal API key for backend → api server communication (daily_update.py)
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
+# ── API Key Rate Limiting ─────────────────────────────────────────────────────
+# Per-API-key rate limit: max 40 requests per minute using a sliding window.
+# Stores a deque of request timestamps (float, seconds) per API key in memory.
+RATE_LIMIT_MAX = 40
+RATE_LIMIT_WINDOW = 60  # seconds
+
+_api_key_request_times: dict[str, deque] = {}
+
+
+def is_rate_limited(api_key: str) -> bool:
+    """Return True if the given API key has exceeded the rate limit."""
+    now = time.time()
+    if api_key not in _api_key_request_times:
+        _api_key_request_times[api_key] = deque()
+
+    timestamps = _api_key_request_times[api_key]
+
+    # Remove timestamps outside the sliding window
+    while timestamps and timestamps[0] < now - RATE_LIMIT_WINDOW:
+        timestamps.popleft()
+
+    if len(timestamps) >= RATE_LIMIT_MAX:
+        return True  # limit exceeded — do not record this request
+
+    timestamps.append(now)
+    return False
+
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
@@ -177,6 +205,13 @@ async def verify_api_key(request: Request, call_next):
         return JSONResponse(
             status_code=403,
             content={"detail": "Request IP is not in the allowed IP list for this API key"}
+        )
+
+    # Rate limit check — must come before call_next so rejected requests are not logged
+    if is_rate_limited(api_key):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please wait a moment and try again."},
         )
 
     # Key is valid and IP is permitted — time the request and log it for the
