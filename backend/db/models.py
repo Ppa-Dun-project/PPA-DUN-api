@@ -304,3 +304,21 @@ class LeagueBaseline(Base):
     mean        = Column(Float,       nullable=False)
     std         = Column(Float,       nullable=False)
     computed_at = Column(DateTime,    nullable=False)
+
+
+# ── APIRequestLog ─────────────────────────────────────────────────────────────
+# Logs each authenticated API request for per-user usage tracking.
+# Inserted by api/main.py middleware after each request from a user-issued key.
+# Queried by Grafana (per-user dashboard) via MySQL data source.
+# INTERNAL_API_KEY traffic is excluded (no logging).
+
+class APIRequestLog(Base):
+    __tablename__ = "api_request_logs"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    api_key     = Column(String(64),  nullable=False)              # which key issued the call (audit)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    path        = Column(String(255), nullable=True)               # e.g. /player/bid
+    status      = Column(Integer,     nullable=True)               # HTTP response code
+    duration_ms = Column(Float,       nullable=True)               # request processing time
+    ts          = Column(DateTime,    nullable=False, default=datetime.utcnow, index=True)

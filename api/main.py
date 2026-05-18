@@ -1,6 +1,8 @@
 # Player valuation API service entry point.
 
 import os
+import time
+from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -145,7 +147,7 @@ async def verify_api_key(request: Request, call_next):
     try:
         db = SessionLocal()
         result = db.execute(
-            text("SELECT id FROM api_keys WHERE `key` = :key"),  # :key is a parameter placeholder to prevent SQL injection
+            text("SELECT id, user_id FROM api_keys WHERE `key` = :key"),  # :key is a parameter placeholder to prevent SQL injection
             {"key": api_key}
         ).fetchone()
 
@@ -177,8 +179,38 @@ async def verify_api_key(request: Request, call_next):
             content={"detail": "Request IP is not in the allowed IP list for this API key"}
         )
 
-    # Key is valid and IP is permitted
-    return await call_next(request)
+    # Key is valid and IP is permitted — time the request and log it for the
+    # per-user usage dashboard (Grafana reads api_request_logs via MySQL).
+    user_id = result[1]
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start) * 1000.0
+
+    try:
+        log_db = SessionLocal()
+        log_db.execute(
+            text("""
+                INSERT INTO api_request_logs
+                    (api_key, user_id, path, status, duration_ms, ts)
+                VALUES
+                    (:key, :uid, :path, :status, :dur, :ts)
+            """),
+            {
+                "key": api_key,
+                "uid": user_id,
+                "path": request.url.path,
+                "status": response.status_code,
+                "dur": duration_ms,
+                "ts": datetime.utcnow(),
+            },
+        )
+        log_db.commit()
+        log_db.close()
+    except Exception as exc:
+        # Logging failure must not break the response. Just record and move on.
+        logging.warning("api_request_logs insert failed: %s", exc)
+
+    return response
 
 # ── Exception Handlers ────────────────────────────────────────────────────────
 # Simple handler to return a cleaner error message instead of default FastAPI 422 error response
